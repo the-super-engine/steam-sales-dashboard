@@ -241,24 +241,31 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black text-white font-mono bg-grid-pattern relative overflow-hidden">
+      <div className="flex flex-col items-center justify-center h-screen bg-black text-white font-mono bg-grid-pattern relative overflow-hidden">
         {/* Loading State Background */}
         <div className="absolute inset-0 bg-gradient-to-t from-black to-gray-900 opacity-50"></div>
-        {/* Progress Bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-white/10">
-            <motion.div 
-                className="h-full bg-white"
-                animate={{ width: ["0%", "80%", "95%"] }}
-                transition={{ duration: 5, ease: "circOut" }}
-            />
+        
+        <div className="relative z-10 flex flex-col items-center gap-8 max-w-md text-center p-8">
+            <div className="w-16 h-16 rounded-full border border-white/20 flex items-center justify-center">
+                <Activity className="w-8 h-8 animate-pulse text-emerald-400" />
+            </div>
+            
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold uppercase tracking-widest">Waiting for Data</h2>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                    Connecting to local background process to fetch Steam data. 
+                    If this takes too long, please ensure you are logged into Steamworks in the background browser window.
+                </p>
+            </div>
+
+            <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                <motion.div 
+                    className="h-full bg-emerald-400"
+                    animate={{ width: ["0%", "100%"] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+            </div>
         </div>
-        <motion.div 
-          animate={{ opacity: [0.5, 1, 0.5] }} 
-          transition={{ duration: 2, repeat: Infinity }}
-          className="relative z-10 text-sm tracking-widest uppercase"
-        >
-          Connecting to Steam Data Stream...
-        </motion.div>
       </div>
     )
   }

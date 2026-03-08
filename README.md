@@ -1,73 +1,86 @@
-# React + TypeScript + Vite
+# Steam Sales Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, real-time dashboard for Steam app/game developers to visualize sales data effectively.
 
-Currently, two official plugins are available:
+## Introduction & How It Works
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+**What is this app?**
+This application is a specialized dashboard designed to give Steam developers a better way to visualize their sales and wishlist data. Instead of manually downloading CSV reports from Steamworks and creating charts in Excel, this app automates the process and presents your data in a beautiful, real-time interface.
 
-## React Compiler
+**How does it work?**
+The application operates on a simple, secure principle:
+1.  **Background Browser**: It runs a standard web browser in the background (hidden from view) that navigates to the official Steamworks website.
+2.  **Local Data Fetching**: Once you log in to Steamworks in this background browser, the app detects your session and automatically downloads the necessary sales and wishlist CSV files directly from Steam.
+3.  **Local Processing**: It parses these files instantly on your computer to generate the charts and metrics you see.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Privacy & Security**
+*   **100% Local**: All data processing happens locally on your machine.
+*   **No Cloud Uploads**: Your sales data, credentials, and cookies are **never** sent to any third-party server or cloud storage.
+*   **Direct Connection**: The app communicates directly between your computer and Steam's servers, just like your regular web browser.
 
-## Expanding the ESLint configuration
+## Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Real-time Monitoring**: Track sales, revenue, and wishlists in real-time.
+- **Multi-App Support**: Monitor multiple Steam apps from a single dashboard.
+- **Launch Day Ready**: Designed for big screens to visualize launch day performance.
+- **Local & Secure**: Runs completely locally, keeping your sensitive sales data safe.
+- **Cross-Platform**: Available for Windows and macOS.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Installation
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Download the latest release from the [Releases Page](https://github.com/the-super-engine/steam-sales-dashboard/releases).
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### macOS Users (Important)
+
+Since the application is not signed with an Apple Developer Certificate (to keep it free and open source), you may see a warning when opening it. To bypass this:
+
+1. Move the app to your `Applications` folder.
+2. Open Terminal and run the following command:
+
+```bash
+xattr -cr /Applications/"Steam Sales Dashboard.app"
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+3. Open the app as usual.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Prerequisites
+
+- Node.js (v20 or later)
+- npm
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/the-super-engine/steam-sales-dashboard.git
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
+
+### Build
+
+```bash
+npm run build
+```
+
+## Tech Stack
+
+- **Electron**: Cross-platform desktop framework
+- **React**: UI library
+- **Vite**: Build tool and dev server
+- **Tailwind CSS**: Styling
+- **Recharts**: Data visualization
+
+## License
+
+MIT
+
+## Credits
+
+Powered by [Soda Game](https://soda-game.com) & [Vibart AI](https://vibart.ai)

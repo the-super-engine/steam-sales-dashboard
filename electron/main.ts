@@ -152,6 +152,15 @@ function checkUrl() {
   const url = steamView.webContents.getURL()
   console.log('Current URL:', url)
 
+  // FIX: If on login page, ensure dashboard is hidden so user can log in
+  if (url.includes('/login/') || url.includes('login.steampowered.com')) {
+    console.log('Login page detected. Hiding Dashboard to allow login.')
+    setDashboardVisibility(false)
+    autoOpenedOnLaunch = false // Reset so it opens automatically after login
+    win?.webContents.send('steam-target-detected', false)
+    return
+  }
+
   if (TARGET_URL_PATTERN.test(url)) {
     console.log('Target URL detected! Showing Dashboard option.')
     scrapeData()
