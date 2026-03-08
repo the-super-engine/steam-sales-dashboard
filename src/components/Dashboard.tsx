@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Activity, X, ArrowUpRight, TrendingUp, RefreshCw, Palette, Clock3, Languages, ArrowLeft, AlertTriangle } from 'lucide-react'
+import { Activity, X, ArrowUpRight, TrendingUp, RefreshCw, Palette, Clock3, Languages, ArrowLeft, AlertTriangle, Info } from 'lucide-react'
 import CountUp from 'react-countup'
 import { ipcRenderer } from 'electron'
 import { format } from 'date-fns'
@@ -10,6 +10,7 @@ import ExtendedMetrics from './ExtendedMetrics'
 import ErrorBoundary from './ErrorBoundary'
 import AdvancedInsights from './AdvancedInsights'
 import WishlistInsights from './WishlistInsights'
+import AboutModal from './AboutModal'
 
 interface DashboardProps {
   data: {
@@ -59,6 +60,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'sales' | 'wishlist'>('sales')
   const [utcNow, setUtcNow] = useState(new Date())
   const [showNoDataHint, setShowNoDataHint] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true)
@@ -302,6 +304,14 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
 
       {/* Scrollable Container */}
       <div className="absolute inset-0 overflow-y-auto overflow-x-hidden p-8 pt-10">
+        {/* Top Draggable Area (Fixed) */}
+        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+        {/* @ts-ignore */}
+        <div className="fixed top-0 left-0 right-0 h-10 z-[100] pointer-events-none">
+            {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+            {/* @ts-ignore */}
+            <div className="w-full h-full pointer-events-auto" style={{ WebkitAppRegion: 'drag' }} />
+        </div>
         
         {/* Loading Bar - When refreshing */}
         {isRefreshing && (
@@ -326,19 +336,24 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className={cn('flex justify-between items-start mb-12 border-b pb-6', themeStyles.panelBorder)}
+          className={cn('relative flex justify-between items-start mb-12 border-b pb-6 pt-6', themeStyles.panelBorder)}
         >
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className={cn('w-2 h-2 rounded-full animate-pulse', themeStyles.accentBg)}></span>
-              <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">
-                {copy.lastUpdated}: {format(lastUpdated, 'HH:mm:ss')}
-              </span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-black leading-none uppercase tracking-normal">
-              {(data.title || 'STEAM APP').toUpperCase()}
-            </h1>
-            <div className="mt-2 inline-flex items-center gap-2 bg-black/50 rounded-full text-[11px] font-mono text-gray-300 relative group">
+            <div className="relative z-10">
+               <div className="flex items-center gap-3 mb-2">
+                 <span className={cn('w-2 h-2 rounded-full animate-pulse', themeStyles.accentBg)}></span>
+                 <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">
+                   {copy.lastUpdated}: {format(lastUpdated, 'HH:mm:ss')}
+                 </span>
+               </div>
+               <h1 className="text-3xl md:text-4xl font-black leading-none uppercase tracking-normal">
+                 {(data.title || 'STEAM APP').toUpperCase()}
+               </h1>
+             </div>
+
+             {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+             {/* @ts-ignore */}
+             <div className="mt-2 inline-flex items-center gap-2 bg-black/50 rounded-full text-[11px] font-mono text-gray-300 relative group z-[60]" style={{ WebkitAppRegion: 'no-drag' }}>
               <Clock3 className="w-3.5 h-3.5" />
               <span>{copy.utcNow} {getUtcResetInfo().now}</span>
               <span className="text-gray-500">|</span>
@@ -355,7 +370,9 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+          {/* @ts-ignore */}
+          <div className="flex items-center gap-4 relative z-[110]" style={{ WebkitAppRegion: 'no-drag' }}>
              <div className="relative">
                 <button
                   onClick={() => setThemeMenuOpen(v => !v)}
@@ -449,9 +466,17 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
              <button
                 onClick={onBack}
                 className={cn('flex items-center gap-2 px-3 h-11 border rounded-full transition-colors bg-black/40 hover:bg-white/10 cursor-pointer', themeStyles.panelBorder)}
+                title="Back to List"
              >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-xs font-mono">{copy.back}</span>
+             </button>
+
+             <button
+                onClick={() => setAboutOpen(true)}
+                className={cn('flex items-center justify-center bg-black/50 backdrop-blur-md border rounded-lg w-9 h-9 cursor-pointer', themeStyles.panelBorder)}
+             >
+                <Info className={cn('w-3.5 h-3.5', themeStyles.chipText)} />
              </button>
 
              <button 
@@ -647,6 +672,20 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 </div>
             )}
         </motion.div>
+        {/* Footer */}
+        <div className="mt-12 pt-8 border-t border-white/5 flex justify-center pb-8">
+            <a 
+                href="https://soda-game.com" 
+                target="_blank" 
+                rel="noreferrer" 
+                className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors uppercase tracking-widest flex items-center gap-2"
+            >
+                POWERED BY SODA GAME
+            </a>
+        </div>
+
+        <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} locale={locale} />
+
         </motion.div>
       </div>
     </div>

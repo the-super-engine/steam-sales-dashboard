@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, TrendingUp, ArrowRight } from 'lucide-react'
+import { X, TrendingUp, ArrowRight, Info } from 'lucide-react'
 import CountUp from 'react-countup'
+import AboutModal from './AboutModal'
 
 interface PortfolioData {
   type: 'portfolio'
@@ -26,6 +28,7 @@ interface PortfolioDashboardProps {
 }
 
 export default function PortfolioDashboard({ data, onClose, onSelect }: PortfolioDashboardProps) {
+  const [aboutOpen, setAboutOpen] = useState(false)
   // Sort games by rank
   const sortedGames = [...data.games].sort((a, b) => {
     const rankA = parseInt(a.rank) || 999;
@@ -57,15 +60,17 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
       <div className="absolute inset-0 z-0 bg-grid-pattern opacity-10 pointer-events-none"></div>
 
       {/* Draggable Region */}
-      {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-      {/* @ts-ignore */}
-      <div className="absolute top-0 left-0 right-0 h-8 z-50" style={{ WebkitAppRegion: 'drag' }} />
+      <div className="absolute top-0 left-0 right-0 h-8 z-50 pointer-events-none">
+        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+        {/* @ts-ignore */}
+        <div className="w-full h-full" style={{ WebkitAppRegion: 'drag' }} />
+      </div>
 
       <motion.div 
         variants={container}
         initial="hidden"
         animate="show"
-        className="relative z-10 max-w-7xl mx-auto flex flex-col h-full"
+        className="relative z-10 max-w-7xl mx-auto flex flex-col h-full pt-16"
       >
         {/* Header */}
         <motion.div variants={item} className="flex justify-between items-end mt-8 mb-12 border-b border-white/10 pb-8">
@@ -74,9 +79,20 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
               <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
               <span className="font-mono text-xs text-gray-500 uppercase tracking-widest">Global Portfolio View</span>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold leading-none mb-2">
-              {data.title || 'ALL APPS'}
-            </h1>
+            <div className="flex items-center gap-4 mb-2">
+              <h1 className="text-5xl md:text-6xl font-bold leading-none">
+                {data.title || 'ALL APPS'}
+              </h1>
+              <button
+                 onClick={() => setAboutOpen(true)}
+                 className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors border border-white/5 z-50"
+                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                 // @ts-ignore
+                 style={{ WebkitAppRegion: 'no-drag' }}
+              >
+                 <Info className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex items-center gap-2 text-gray-400 font-mono text-sm">
               <TrendingUp className="w-4 h-4 text-white" />
               TOTAL UNITS TODAY: <span className="text-white font-bold"><CountUp end={totalUnits} duration={2} separator="," /></span>
@@ -85,13 +101,28 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
           
           <button 
             onClick={onClose}
-            className="group relative w-12 h-12 flex items-center justify-center shrink-0 overflow-hidden border border-white/20 rounded-full hover:border-white transition-colors mb-4"
+            className="group relative w-12 h-12 flex items-center justify-center shrink-0 overflow-hidden border border-white/20 rounded-full hover:border-white transition-colors mb-4 z-50"
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            style={{ WebkitAppRegion: 'no-drag' }}
           >
             <X className="w-6 h-6 relative z-10 transition-transform group-hover:rotate-90" />
             <div className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-0"></div>
             <X className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-black opacity-0 group-hover:opacity-100 z-20 transition-opacity" />
           </button>
-        </motion.div>
+          {/* Footer */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center z-50">
+        <a 
+            href="https://soda-game.com" 
+            target="_blank" 
+            rel="noreferrer" 
+            className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors uppercase tracking-widest flex items-center gap-2"
+        >
+            POWERED BY SODA GAME
+        </a>
+      </div>
+    </motion.div>
+        <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} locale="en" />
 
         {/* Company Lifetime Stats */}
         {data.lifetimeRevenue && (

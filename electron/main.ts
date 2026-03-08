@@ -1,4 +1,4 @@
-import { app, BrowserWindow, BrowserView, ipcMain, session, type DownloadItem, type WebContents, type Event as ElectronEvent } from 'electron'
+import { app, BrowserWindow, BrowserView, ipcMain, session, shell, type DownloadItem, type WebContents, type Event as ElectronEvent } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { parse } from 'csv-parse/sync'
@@ -34,7 +34,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(process.env.PUBLIC ?? '', 'electron-vite.svg'),
+    icon: path.join(process.env.PUBLIC ?? '', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '../dist-electron/preload.js'),
       nodeIntegration: true,
@@ -43,6 +43,14 @@ function createWindow() {
     backgroundColor: '#000000', // Dark background for dashboard feel
     titleBarStyle: 'hiddenInset', // Native-like dark bar on macOS
     trafficLightPosition: { x: 12, y: 12 }
+  })
+
+  // Handle external links
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
   })
 
   // Hide the menu bar
