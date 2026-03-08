@@ -11,6 +11,8 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Code
@@ -19,11 +21,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install Dependencies
         run: npm ci
+        timeout-minutes: 10
 
       # Ensure build/ directory with icons exists
       # On macOS/Linux, we might need to regenerate icons if they are not in git
@@ -33,6 +36,9 @@ jobs:
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+        timeout-minutes: 30
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

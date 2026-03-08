@@ -1,4 +1,4 @@
-import { app, BrowserWindow, BrowserView, ipcMain, session, shell, type DownloadItem, type WebContents, type Event as ElectronEvent } from 'electron'
+import { app, BrowserWindow, BrowserView, ipcMain, session, shell, net, type DownloadItem, type WebContents, type Event as ElectronEvent } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { parse } from 'csv-parse/sync'
@@ -1026,3 +1026,80 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })
+
+// Update Checker Logic
+// Check for updates by fetching the GitHub releases page (no API, just regex on HTML)
+ipcMain.handle('check-for-update', async () => {
+    try {
+        const RELEASES_URL = 'https://github.com/the-super-engine/steam-sales-dashboard/tags';
+        const currentVersion = app.getVersion();
+        
+        console.log(`Checking for updates... Current version: ${currentVersion}`);
+        
+        // Use electron's net module to fetch the page content
+        const request = net.request(RELEASES_URL);
+        
+        return new Promise((resolve) => {
+            request.on('response', (response) => {
+                let body = '';
+                response.on('data', (chunk) => {
+                    body += chunk.toString();
+                });
+                
+                response.on('end', () => {
+                    // Look for version tags in the HTML: /releases/tag/v1.0.1 or /tree/v1.0.1
+                    // The tags page lists tags like: /the-super-engine/steam-sales-dashboard/releases/tag/v1.0.1
+                    // Also tags page might have links like /the-super-engine/steam-sales-dashboard/tree/v1.0.1
+                    
+                    // Regex to find semantic versions in the page content
+                    // Match v1.2.3 style versions
+                    const versionRegex = /v(\d+\.\d+\.\d+)/g;
+                    
+                    let match;
+                    let latestVersion = '0.0.0';
+                    
+                    while ((match = versionRegex.exec(body)) !== null) {
+                        const foundVersion = match[1];
+                        if (isVersionNewer(foundVersion, latestVersion)) {
+                            latestVersion = foundVersion;
+                        }
+                    }
+                    
+                    const hasUpdate = isVersionNewer(latestVersion, currentVersion);
+                    console.log(`Update check result: hasUpdate=${hasUpdate}, latest=${latestVersion}`);
+                    
+                    resolve({
+                        hasUpdate,
+                        latestVersion,
+                        currentVersion,
+                        releasesUrl: 'https://github.com/the-super-engine/steam-sales-dashboard/releases'
+                    });
+                });
+            });
+            
+            request.on('error', (error) => {
+                console.error('Update check failed:', error);
+                resolve({ hasUpdate: false, error: error.message });
+            });
+            
+            request.end();
+        });
+    } catch (e) {
+        console.error('Update check error:', e);
+        return { hasUpdate: false, error: e instanceof Error ? e.message : String(e) };
+    }
+});
+
+function isVersionNewer(latest: string, current: string): boolean {
+    const parse = (s: string) => s.trim().split('.').map(n => parseInt(n, 10) || 0);
+    const a = parse(latest);
+    const b = parse(current);
+    
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+        const x = a[i] || 0;
+        const y = b[i] || 0;
+        if (x > y) return true;
+        if (x < y) return false;
+    }
+    return false;
+}

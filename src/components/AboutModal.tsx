@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Github, ExternalLink } from 'lucide-react'
+import { X, Github, ExternalLink, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react'
 import logo from '../assets/logo.png'
+import { ipcRenderer } from 'electron'
 
 interface AboutModalProps {
   isOpen: boolean
@@ -8,7 +10,39 @@ interface AboutModalProps {
   locale: 'en' | 'zh-CN'
 }
 
+type UpdateStatus = 'idle' | 'checking' | 'available' | 'latest' | 'error'
+
 export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps) {
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
+  const [latestVersion, setLatestVersion] = useState<string | null>(null)
+  const [releasesUrl, setReleasesUrl] = useState<string>('')
+  
+  useEffect(() => {
+    if (isOpen) {
+        setUpdateStatus('idle')
+        setLatestVersion(null)
+    }
+  }, [isOpen])
+
+  const checkForUpdates = async () => {
+    setUpdateStatus('checking')
+    try {
+        const result = await ipcRenderer.invoke('check-for-update')
+        if (result.error) {
+            setUpdateStatus('error')
+        } else if (result.hasUpdate) {
+            setUpdateStatus('available')
+            setLatestVersion(result.latestVersion)
+            setReleasesUrl(result.releasesUrl)
+        } else {
+            setUpdateStatus('latest')
+            setLatestVersion(result.currentVersion)
+        }
+    } catch (e) {
+        setUpdateStatus('error')
+    }
+  }
+
   const copy = locale === 'zh-CN' 
     ? {
         title: '关于 Steam Sales Dashboard',
@@ -21,7 +55,12 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
         ],
         disclaimer: '免责声明：本应用与 Valve 或 Steam 无任何关联。',
         github: '开源仓库',
-        website: '访问官网'
+        website: '访问官网',
+        checkUpdate: '检查更新',
+        checking: '检查中...',
+        updateAvailable: '发现新版本',
+        latest: '已是最新',
+        error: '检查失败'
       }
     : {
         title: 'About Steam Sales Dashboard',
@@ -34,7 +73,12 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
         ],
         disclaimer: 'Disclaimer: This application is not affiliated with Valve or Steam.',
         github: 'GitHub Repo',
-        website: 'Website'
+        website: 'Website',
+        checkUpdate: 'Check Updates',
+        checking: 'Checking...',
+        updateAvailable: 'Update Available',
+        latest: 'Up to Date',
+        error: 'Check Failed'
     }
 
   return (
@@ -60,13 +104,57 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
 
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10"
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10 z-50"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="relative z-10">
-                <img src={logo} alt="Steam Sales Dashboard" className="w-16 h-16 rounded-xl mb-6 shadow-lg object-cover" />
+                <div className="flex items-start justify-between">
+                    <img src={logo} alt="Steam Sales Dashboard" className="w-16 h-16 rounded-xl mb-6 shadow-lg object-cover" />
+                    
+                    {/* Update Checker */}
+                    <div className="flex flex-col items-end gap-2 mt-1">
+                        {updateStatus === 'idle' && (
+                            <button 
+                                onClick={checkForUpdates}
+                                className="text-xs font-mono text-gray-500 hover:text-white flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-white/5"
+                            >
+                                <RefreshCw className="w-3 h-3" />
+                                {copy.checkUpdate}
+                            </button>
+                        )}
+                        {updateStatus === 'checking' && (
+                            <div className="text-xs font-mono text-gray-500 flex items-center gap-1 animate-pulse px-2 py-1">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                {copy.checking}
+                            </div>
+                        )}
+                        {updateStatus === 'available' && (
+                            <a 
+                                href={releasesUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-mono text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20"
+                            >
+                                <ExternalLink className="w-3 h-3" />
+                                {copy.updateAvailable} {latestVersion && `(${latestVersion})`}
+                            </a>
+                        )}
+                        {updateStatus === 'latest' && (
+                            <div className="text-xs font-mono text-gray-500 flex items-center gap-1 px-2 py-1">
+                                <CheckCircle className="w-3 h-3" />
+                                {copy.latest} {latestVersion && `(${latestVersion})`}
+                            </div>
+                        )}
+                        {updateStatus === 'error' && (
+                            <div className="text-xs font-mono text-red-400 flex items-center gap-1 px-2 py-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {copy.error}
+                            </div>
+                        )}
+                    </div>
+                </div>
                 
                 <h2 className="text-2xl font-bold text-white mb-2">{copy.title}</h2>
                 <p className="text-gray-400 mb-6 leading-relaxed">
