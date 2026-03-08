@@ -111,7 +111,7 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
             <X className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-black opacity-0 group-hover:opacity-100 z-20 transition-opacity" />
           </button>
           {/* Footer */}
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center z-50">
+      <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center justify-center gap-2 z-50">
         <a 
             href="https://soda-game.com" 
             target="_blank" 
@@ -119,6 +119,14 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
             className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors uppercase tracking-widest flex items-center gap-2"
         >
             POWERED BY SODA GAME
+        </a>
+        <a 
+            href="https://vibart.ai" 
+            target="_blank" 
+            rel="noreferrer" 
+            className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors uppercase tracking-widest flex items-center gap-2"
+        >
+            VIBART AI
         </a>
       </div>
     </motion.div>

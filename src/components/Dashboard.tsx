@@ -673,7 +673,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
             )}
         </motion.div>
         {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-white/5 flex justify-center pb-8">
+        <div className="mt-12 pt-8 border-t border-white/5 flex flex-col items-center justify-center gap-3 pb-8">
             <a 
                 href="https://soda-game.com" 
                 target="_blank" 
@@ -681,6 +681,14 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors uppercase tracking-widest flex items-center gap-2"
             >
                 POWERED BY SODA GAME
+            </a>
+            <a 
+                href="https://vibart.ai" 
+                target="_blank" 
+                rel="noreferrer" 
+                className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors uppercase tracking-widest flex items-center gap-2"
+            >
+                VIBART AI
             </a>
         </div>
 
