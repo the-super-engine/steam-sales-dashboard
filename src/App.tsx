@@ -88,10 +88,14 @@ function App() {
       setIsVisible(true)
     })
 
+    // Listen for dashboard visibility updates
     ipcRenderer.on('dashboard-visibility', (_event, visible) => {
       console.log('Received dashboard visibility:', visible)
       setIsVisible(Boolean(visible))
     })
+    
+    // Request initial visibility state in case we missed the event
+    ipcRenderer.send('request-visibility-state')
     
     return () => {
       ipcRenderer.removeAllListeners('steam-data-update')

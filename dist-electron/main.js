@@ -1479,16 +1479,18 @@ process.env.DIST = path.join(__dirname, "../dist");
 process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL ? path.join(process.env.DIST_ELECTRON, "../public") : process.env.DIST;
 let win = null;
 let steamView = null;
-const STEAM_URL = "https://partner.steampowered.com/nav_games.php";
+const STEAM_ROOT_URL = "https://partner.steampowered.com/";
+const STEAM_ALL_APPS_URL = "https://partner.steampowered.com/nav_games.php";
 const TARGET_URL_PATTERN = /partner\.steampowered\.com\/app\/details\/(\d+)/;
-const ALL_PRODUCTS_PATTERN = /partner\.steampowered\.com\/(nav_games\.php|)/;
+const ALL_PRODUCTS_PATTERN = /partner\.steampowered\.com\/nav_games\.php(?:\?|$)/;
 let backgroundView = null;
 let autoOpenedOnLaunch = false;
 function createWindow() {
+  const iconName = process.platform === "win32" ? "icon.ico" : "icon.png";
   win = new electron.BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(process.env.PUBLIC ?? "", "icon.png"),
+    icon: path.join(process.env.PUBLIC ?? "", iconName),
     webPreferences: {
       preload: path.join(__dirname, "../dist-electron/preload.js"),
       nodeIntegration: true,
@@ -1543,6 +1545,7 @@ function createSteamView() {
       // partition: 'persist:steam', // Keep session
     }
   });
+  steamView.webContents.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
   win.setBrowserView(steamView);
   const bounds = win.getContentBounds();
   steamView.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
@@ -1554,7 +1557,7 @@ function createSteamView() {
       }
     }
   });
-  steamView.webContents.loadURL(STEAM_URL);
+  steamView.webContents.loadURL(STEAM_ROOT_URL);
   steamView.webContents.on("did-finish-load", () => {
     checkUrl();
   });
@@ -1563,6 +1566,16 @@ function createSteamView() {
   });
   steamView.webContents.on("did-navigate-in-page", () => {
     checkUrl();
+  });
+  steamView.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return;
+    console.error("Steam View failed to load:", errorCode, errorDescription, validatedURL);
+    if (errorCode === -3) return;
+    setDashboardVisibility(false);
+    setTimeout(() => {
+      if (!steamView || steamView.webContents.isDestroyed()) return;
+      steamView.webContents.loadURL(STEAM_ROOT_URL);
+    }, 1500);
   });
 }
 let dashboardActive = false;
@@ -1577,6 +1590,15 @@ function checkUrl() {
     setDashboardVisibility(false);
     autoOpenedOnLaunch = false;
     win?.webContents.send("steam-target-detected", false);
+    return;
+  }
+  if (url === STEAM_ROOT_URL || url.startsWith(`${STEAM_ROOT_URL}home`)) {
+    console.log("Steam root/home detected. Redirecting to All Apps page.");
+    setDashboardVisibility(false);
+    autoOpenedOnLaunch = false;
+    if (steamView && !steamView.webContents.isDestroyed()) {
+      steamView.webContents.loadURL(STEAM_ALL_APPS_URL);
+    }
     return;
   }
   const isTarget = TARGET_URL_PATTERN.test(url);
@@ -2255,17 +2277,23 @@ electron.ipcMain.on("navigate-to-app", (_event, appId) => {
 });
 electron.ipcMain.on("navigate-to-portfolio", () => {
   if (!steamView) return;
-  console.log(`Navigating back to portfolio: ${STEAM_URL}`);
-  steamView.webContents.loadURL(STEAM_URL);
+  console.log(`Navigating back to portfolio: ${STEAM_ALL_APPS_URL}`);
+  steamView.webContents.loadURL(STEAM_ALL_APPS_URL);
 });
 electron.ipcMain.on("logout", () => {
   if (!steamView) return;
   const logoutUrl = "https://partner.steampowered.com/login/logout";
   console.log(`Logging out -> ${logoutUrl}`);
+  setDashboardVisibility(false);
   steamView.webContents.loadURL(logoutUrl);
 });
 electron.ipcMain.on("toggle-dashboard", (_event, show) => {
   setDashboardVisibility(show);
+});
+electron.ipcMain.on("request-visibility-state", () => {
+  if (win && !win.webContents.isDestroyed()) {
+    win.webContents.send("dashboard-visibility", dashboardActive);
+  }
 });
 function setDashboardVisibility(show) {
   dashboardActive = show;
