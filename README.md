@@ -5,6 +5,8 @@
 
 A modern, real-time dashboard for Steam app/game developers to visualize sales data effectively.
 
+*This is an experimental app. Contributions and feedback are welcome!*
+
 **Build by [SODA GAME](https://soda-game.com)**
 
 ## ✨ Features
