@@ -1,8 +1,7 @@
+![Steam Sales Dashboard Cover](readme_cover.png)
 # Steam Sales Dashboard
 
 [English](README.md) | [简体中文](README_zh-CN.md)
-
-![Steam Sales Dashboard Cover](readme_cover.png)
 
 A modern, real-time dashboard for Steam app/game developers to visualize sales data effectively.
 
