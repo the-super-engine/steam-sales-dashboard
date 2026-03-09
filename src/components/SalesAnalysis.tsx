@@ -3,19 +3,30 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { Activity, Calendar } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { filterData, aggregateData, type DataPoint, type TimeRange, type Granularity } from '../lib/analytics'
+import { translations, type Locale } from '../lib/locales'
 
 interface SalesAnalysisProps {
   history: DataPoint[]
+  locale?: Locale
 }
 
-export default function SalesAnalysis({ history }: SalesAnalysisProps) {
+export default function SalesAnalysis({ history, locale = 'en' }: SalesAnalysisProps) {
   const [range, setRange] = useState<TimeRange>('30D')
   const [granularity, setGranularity] = useState<Granularity>('day')
+  const [customDateRange, setCustomDateRange] = useState<{ from: string; to: string }>({
+    from: '',
+    to: ''
+  })
+  const t = translations[locale]
 
   const chartData = useMemo(() => {
-    const filtered = filterData(history, range)
+    const custom = range === 'CUSTOM' && customDateRange.from && customDateRange.to
+      ? { from: new Date(customDateRange.from), to: new Date(customDateRange.to) }
+      : undefined
+      
+    const filtered = filterData(history, range, custom)
     return aggregateData(filtered, granularity)
-  }, [history, range, granularity])
+  }, [history, range, granularity, customDateRange])
 
   return (
     <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm min-h-[450px] flex flex-col">
@@ -23,10 +34,10 @@ export default function SalesAnalysis({ history }: SalesAnalysisProps) {
         <div>
           <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
             <Activity className="w-5 h-5" />
-            SALES PERFORMANCE
+            {t.salesPerformance}
           </h3>
           <div className="text-xs text-gray-500 font-mono">
-            {chartData.length} DATA POINTS
+            {chartData.length} {t.dataPoints}
           </div>
         </div>
 
@@ -45,7 +56,34 @@ export default function SalesAnalysis({ history }: SalesAnalysisProps) {
                 {r}
               </button>
             ))}
+            <button
+                onClick={() => setRange('CUSTOM')}
+                className={cn(
+                  "px-3 py-1 text-xs font-mono font-bold rounded transition-colors",
+                  range === 'CUSTOM' ? "bg-white text-black" : "text-gray-400 hover:text-white"
+                )}
+            >
+                {t.custom}
+            </button>
           </div>
+
+          {range === 'CUSTOM' && (
+            <div className="flex items-center gap-2 bg-black/50 border border-white/10 rounded-lg p-1 px-2 animate-in fade-in slide-in-from-left-2 duration-200">
+                <input 
+                    type="date" 
+                    value={customDateRange.from}
+                    onChange={(e) => setCustomDateRange(prev => ({ ...prev, from: e.target.value }))}
+                    className="bg-transparent text-white text-xs font-mono outline-none border-b border-white/20 focus:border-white/50 pb-0.5 w-24"
+                />
+                <span className="text-gray-500">-</span>
+                <input 
+                    type="date" 
+                    value={customDateRange.to}
+                    onChange={(e) => setCustomDateRange(prev => ({ ...prev, to: e.target.value }))}
+                    className="bg-transparent text-white text-xs font-mono outline-none border-b border-white/20 focus:border-white/50 pb-0.5 w-24"
+                />
+            </div>
+          )}
 
           {/* Granularity Selector */}
           <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-1">
@@ -56,7 +94,7 @@ export default function SalesAnalysis({ history }: SalesAnalysisProps) {
                   granularity === 'day' ? "bg-white text-black" : "text-gray-400 hover:text-white"
                 )}
               >
-                <Calendar className="w-3 h-3" /> Day
+                <Calendar className="w-3 h-3" /> {t.day}
             </button>
             <button
                 onClick={() => setGranularity('week')}
@@ -65,7 +103,7 @@ export default function SalesAnalysis({ history }: SalesAnalysisProps) {
                   granularity === 'week' ? "bg-white text-black" : "text-gray-400 hover:text-white"
                 )}
               >
-                Week
+                {t.week}
             </button>
             <button
                 onClick={() => setGranularity('month')}
@@ -74,7 +112,7 @@ export default function SalesAnalysis({ history }: SalesAnalysisProps) {
                   granularity === 'month' ? "bg-white text-black" : "text-gray-400 hover:text-white"
                 )}
               >
-                Month
+                {t.month}
             </button>
           </div>
         </div>
@@ -155,7 +193,7 @@ export default function SalesAnalysis({ history }: SalesAnalysisProps) {
           </ResponsiveContainer>
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500 font-mono text-sm border border-dashed border-white/10 rounded">
-            NO DATA AVAILABLE FOR SELECTED PERIOD
+            {t.noData}
           </div>
         )}
       </div>

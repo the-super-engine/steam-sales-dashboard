@@ -1,86 +1,110 @@
 # Steam Sales Dashboard
 
+![Steam Sales Dashboard Cover](readme_cover.png)
+
 A modern, real-time dashboard for Steam app/game developers to visualize sales data effectively.
 
-## Introduction & How It Works
+## 📖 User Manual & Operation Guide
 
-**What is this app?**
-This application is a specialized dashboard designed to give Steam developers a better way to visualize their sales and wishlist data. Instead of manually downloading CSV reports from Steamworks and creating charts in Excel, this app automates the process and presents your data in a beautiful, real-time interface.
+### 1. Installation
 
-**How does it work?**
-The application operates on a simple, secure principle:
-1.  **Background Browser**: It runs a standard web browser in the background (hidden from view) that navigates to the official Steamworks website.
-2.  **Local Data Fetching**: Once you log in to Steamworks in this background browser, the app detects your session and automatically downloads the necessary sales and wishlist CSV files directly from Steam.
-3.  **Local Processing**: It parses these files instantly on your computer to generate the charts and metrics you see.
+**Download**
+Get the latest version from the [Releases Page](https://github.com/the-super-engine/steam-sales-dashboard/releases).
 
-**Privacy & Security**
-*   **100% Local**: All data processing happens locally on your machine.
-*   **No Cloud Uploads**: Your sales data, credentials, and cookies are **never** sent to any third-party server or cloud storage.
-*   **Direct Connection**: The app communicates directly between your computer and Steam's servers, just like your regular web browser.
+**macOS Users (Important)**
+Because this app is open-source and not signed with a paid Apple Developer Certificate, macOS may block it by default. To fix this:
+1.  Move the `Steam Sales Dashboard.app` to your **Applications** folder.
+2.  Open the **Terminal** app.
+3.  Paste and run this command:
+    ```bash
+    xattr -cr /Applications/"Steam Sales Dashboard.app"
+    ```
+4.  You can now open the app normally.
 
-## Features
+---
 
-- **Real-time Monitoring**: Track sales, revenue, and wishlists in real-time.
-- **Multi-App Support**: Monitor multiple Steam apps from a single dashboard.
-- **Launch Day Ready**: Designed for big screens to visualize launch day performance.
-- **Local & Secure**: Runs completely locally, keeping your sensitive sales data safe.
-- **Cross-Platform**: Available for Windows and macOS.
+### 2. First Launch & Login
 
-## Installation
+When you open the application for the first time:
+1.  You will be presented with the official **Steamworks Login** page.
+2.  Please sign in with your Steam Partner credentials.
+    *   *Security Note*: You are logging in directly to Valve's official website. This app uses a standard browser window to load the page. It **does not** record, store, or transmit your password.
+3.  Perform any necessary 2FA (Steam Guard) verification.
 
-Download the latest release from the [Releases Page](https://github.com/the-super-engine/steam-sales-dashboard/releases).
+---
 
-### macOS Users (Important)
+### 3. Using the Dashboard
 
-Since the application is not signed with an Apple Developer Certificate (to keep it free and open source), you may see a warning when opening it. To bypass this:
+Once you are logged in, the app will automatically detect your session and switch to the **Dashboard View**.
 
-1. Move the app to your `Applications` folder.
-2. Open Terminal and run the following command:
+![Dashboard Screenshot](readme_screenshot.png)
 
-```bash
-xattr -cr /Applications/"Steam Sales Dashboard.app"
-```
+**Portfolio View (For Publishers/Multi-App Developers)**
+*   If your account manages multiple games, you will see the **Portfolio Dashboard**.
+*   This screen shows a summary of all your apps, sorted by rank and sales.
+*   **Action**: Click on any game card to view its detailed performance.
 
-3. Open the app as usual.
+**Game Dashboard (Single App View)**
+*   **Real-Time Stats**: View "Today's Revenue", "Units Sold", "Wishlists", and "Active Users" at a glance.
+*   **Historical Data**: The app automatically downloads and parses your sales and wishlist CSVs from Steamworks to generate interactive charts.
+*   **Projections**: See algorithmic projections for today's final sales based on current trends.
+
+---
+
+### 4. Updating & Refreshing
+
+*   **Auto-Refresh**: The dashboard updates its data automatically every **5 minutes**.
+*   **Manual Refresh**: Click the "Refresh" icon in the top toolbar to force an immediate update.
+*   **App Updates**: The app checks for new versions on startup. If an update is available, you will see a notification with a download link.
+
+---
+
+### 5. Signing Out
+
+If you need to switch accounts:
+1.  Go to the **Portfolio View** (click "Back" if you are in a game view).
+2.  Click the **Sign Out** button in the top-right corner.
+3.  You will be returned to the Steamworks Login page.
+
+---
+
+## 🔒 Privacy & Security Principles
+
+This application is designed with a "Local-First" philosophy to ensure your data remains private.
+
+1.  **Direct Connection**: The app acts as a specialized web browser. It communicates **only** with `partner.steampowered.com`.
+2.  **No Cloud Storage**: Your sales data, revenue figures, and player counts are processed **100% locally** on your computer's RAM and disk. Nothing is uploaded to our servers or any third-party cloud.
+3.  **Open Source**: The full source code is available for audit. You can build it yourself if you prefer not to use pre-compiled binaries.
+
+---
 
 ## Development
 
 ### Prerequisites
-
 - Node.js (v20 or later)
 - npm
 
 ### Setup
-
 ```bash
-# Clone the repository
 git clone https://github.com/the-super-engine/steam-sales-dashboard.git
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
 ### Build
-
 ```bash
 npm run build
 ```
 
 ## Tech Stack
-
 - **Electron**: Cross-platform desktop framework
 - **React**: UI library
-- **Vite**: Build tool and dev server
+- **Vite**: Build tool
 - **Tailwind CSS**: Styling
 - **Recharts**: Data visualization
 
 ## License
-
 MIT
 
 ## Credits
-
 Powered by [Soda Game](https://soda-game.com) & [Vibart AI](https://vibart.ai)

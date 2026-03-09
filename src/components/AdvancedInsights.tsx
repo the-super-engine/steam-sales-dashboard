@@ -3,12 +3,13 @@ import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { CalendarDays, SlidersHorizontal } from 'lucide-react'
 import { addDays, eachDayOfInterval, endOfYear, format, getDay, parseISO, startOfYear, subDays } from 'date-fns'
 import { cn } from '../lib/utils'
+import { translations, type Locale } from '../lib/locales'
 
 type DataPoint = { date: string; value: number }
 
 interface AdvancedInsightsProps {
   history: DataPoint[]
-  locale?: 'en' | 'zh-CN'
+  locale?: Locale
 }
 
 type RangePreset = '90D' | '180D' | '365D'
@@ -39,25 +40,8 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
   const [rangePreset, setRangePreset] = useState<RangePreset>('365D')
   const [minUnits, setMinUnits] = useState(0)
   const [hovered, setHovered] = useState<{ date: string; value: number; x: number; y: number } | null>(null)
-  const copy = locale === 'zh-CN'
-    ? {
-        heatmapTitle: '每日销量热力图',
-        heatmapDesc: '按日期展示每日销量强度',
-        hoverHint: '悬浮查看当日销量',
-        unitsLabel: '销量',
-        monthly: '月度销量',
-        weekday: '周内表现',
-        allYears: '全部年份'
-      }
-    : {
-        heatmapTitle: 'DAILY SALES HEATMAP',
-        heatmapDesc: 'Daily units sold intensity by date',
-        hoverHint: 'Hover a cell to inspect daily units',
-        unitsLabel: 'units',
-        monthly: 'Monthly Volume',
-        weekday: 'Weekday Performance',
-        allYears: 'ALL YEARS'
-      }
+  
+  const t = translations[locale]
 
   const normalizedMap = useMemo(() => normalizeHistory(history), [history])
 
@@ -143,9 +127,9 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
           <div>
             <h3 className="text-lg font-bold flex items-center gap-2">
               <CalendarDays className="w-5 h-5" />
-              {copy.heatmapTitle}
+              {t.heatmapTitle}
             </h3>
-            <p className="text-xs text-gray-500 font-mono mt-1">{copy.heatmapDesc}</p>
+            <p className="text-xs text-gray-500 font-mono mt-1">{t.heatmapDesc}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-1">
@@ -155,7 +139,7 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
                 onChange={e => setYearFilter(e.target.value)}
                 className="bg-transparent text-xs font-mono text-white outline-none"
               >
-                <option value="ALL" className="bg-black">{copy.allYears}</option>
+                <option value="ALL" className="bg-black">{t.allYears}</option>
                 {years.map(y => <option key={y} value={y} className="bg-black">{y}</option>)}
               </select>
             </div>
@@ -224,7 +208,7 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
                 <div className="font-bold text-gray-400 mb-1">{hovered.date}</div>
                 <div className="text-lg font-bold text-white leading-none">
                     {hovered.value.toLocaleString()} 
-                    <span className="text-gray-500 text-[10px] ml-1 font-normal uppercase">{copy.unitsLabel}</span>
+                    <span className="text-gray-500 text-[10px] ml-1 font-normal uppercase">{t.unitsLabel}</span>
                 </div>
             </div>
         )}
@@ -242,7 +226,7 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-          <h4 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">{copy.monthly}</h4>
+          <h4 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">{t.monthly}</h4>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthBars}>
@@ -261,7 +245,7 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
         </div>
 
         <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-          <h4 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">{copy.weekday}</h4>
+          <h4 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">{t.weekday}</h4>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weekdayBars}>

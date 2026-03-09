@@ -1,4 +1,21 @@
-"use strict";const t=require("electron");console.log("Steam Preload Script Loaded");t.ipcRenderer.on("show-dashboard-button",()=>{console.log("Received show-dashboard-button command"),o()});function o(){if(document.getElementById("steam-dashboard-fab"))return;if(!document.body){console.log("Document body not ready, retrying in 100ms"),setTimeout(o,100);return}console.log("Injecting Dashboard Button");const e=document.createElement("button");e.id="steam-dashboard-fab",e.innerHTML=`
+"use strict";
+const electron = require("electron");
+console.log("Steam Preload Script Loaded");
+electron.ipcRenderer.on("show-dashboard-button", () => {
+  console.log("Received show-dashboard-button command");
+  injectButton();
+});
+function injectButton() {
+  if (document.getElementById("steam-dashboard-fab")) return;
+  if (!document.body) {
+    console.log("Document body not ready, retrying in 100ms");
+    setTimeout(injectButton, 100);
+    return;
+  }
+  console.log("Injecting Dashboard Button");
+  const btn = document.createElement("button");
+  btn.id = "steam-dashboard-fab";
+  btn.innerHTML = `
     <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="7" height="7"></rect>
@@ -8,7 +25,8 @@
       </svg>
     </span>
     <span>DASHBOARD</span>
-  `,e.style.cssText=`
+  `;
+  btn.style.cssText = `
     position: fixed;
     top: 18px;
     right: 18px;
@@ -30,4 +48,22 @@
     align-items: center;
     gap: 8px;
     backdrop-filter: blur(6px);
-  `,e.onmouseover=()=>{e.style.transform="translateY(-2px)",e.style.background="#fff",e.style.color="#000",e.style.boxShadow="0 10px 28px rgba(0,0,0,0.4)"},e.onmouseout=()=>{e.style.transform="translateY(0)",e.style.background="rgba(0,0,0,0.92)",e.style.color="#fff",e.style.boxShadow="0 8px 24px rgba(0,0,0,0.32)"},e.onclick=()=>{console.log("Dashboard button clicked"),t.ipcRenderer.send("toggle-dashboard",!0)},document.body.appendChild(e)}
+  `;
+  btn.onmouseover = () => {
+    btn.style.transform = "translateY(-2px)";
+    btn.style.background = "#fff";
+    btn.style.color = "#000";
+    btn.style.boxShadow = "0 10px 28px rgba(0,0,0,0.4)";
+  };
+  btn.onmouseout = () => {
+    btn.style.transform = "translateY(0)";
+    btn.style.background = "rgba(0,0,0,0.92)";
+    btn.style.color = "#fff";
+    btn.style.boxShadow = "0 8px 24px rgba(0,0,0,0.32)";
+  };
+  btn.onclick = () => {
+    console.log("Dashboard button clicked");
+    electron.ipcRenderer.send("toggle-dashboard", true);
+  };
+  document.body.appendChild(btn);
+}

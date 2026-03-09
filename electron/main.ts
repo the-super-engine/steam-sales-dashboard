@@ -59,6 +59,8 @@ function createWindow() {
   // Test active push message to Renderer-process
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
+    // Send current visibility state to ensure renderer is in sync
+    win?.webContents.send('dashboard-visibility', dashboardActive)
   })
 
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -161,7 +163,12 @@ function checkUrl() {
     return
   }
 
-  if (TARGET_URL_PATTERN.test(url)) {
+  const isTarget = TARGET_URL_PATTERN.test(url)
+  const isAllProducts = ALL_PRODUCTS_PATTERN.test(url)
+
+  console.log(`URL Analysis: isTarget=${isTarget}, isAllProducts=${isAllProducts}`)
+
+  if (isTarget) {
     console.log('Target URL detected! Showing Dashboard option.')
     scrapeData()
     // Inject the Launch Dashboard button into the Steam page
@@ -184,7 +191,7 @@ function checkUrl() {
         fetchHistory(appId);
         fetchWishlist(appId);
     }
-  } else if (ALL_PRODUCTS_PATTERN.test(url)) {
+  } else if (isAllProducts) {
      console.log('All Products URL detected! Showing Portfolio Dashboard.')
      scrapePortfolioData()
     console.log('Sending show-dashboard-button to Steam View for Portfolio')
@@ -194,6 +201,7 @@ function checkUrl() {
     }, 500)
     win?.webContents.send('steam-target-detected', 'portfolio')
     if (!autoOpenedOnLaunch) {
+      console.log('Auto-opening dashboard for Portfolio view')
       autoOpenedOnLaunch = true
       setDashboardVisibility(true)
     }
@@ -201,6 +209,7 @@ function checkUrl() {
     // We can fetch history for all games too?
     // Maybe later.
   } else {
+    console.log('No matching pattern. Keeping dashboard hidden.')
     win?.webContents.send('steam-target-detected', false)
   }
 }
@@ -971,6 +980,13 @@ ipcMain.on('navigate-to-portfolio', () => {
     if (!steamView) return
     console.log(`Navigating back to portfolio: ${STEAM_URL}`)
     steamView.webContents.loadURL(STEAM_URL)
+})
+
+ipcMain.on('logout', () => {
+    if (!steamView) return
+    const logoutUrl = 'https://partner.steampowered.com/login/logout'
+    console.log(`Logging out -> ${logoutUrl}`)
+    steamView.webContents.loadURL(logoutUrl)
 })
 
 // IPC to toggle dashboard

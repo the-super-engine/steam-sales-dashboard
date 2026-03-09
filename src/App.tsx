@@ -3,6 +3,7 @@ import { ipcRenderer } from 'electron'
 import { AnimatePresence, motion } from 'framer-motion'
 import Dashboard from './components/Dashboard'
 import PortfolioDashboard from './components/PortfolioDashboard'
+import UpdateModal from './components/UpdateModal'
 
 type PortfolioDashboardData = {
   type: 'portfolio'
@@ -41,15 +42,29 @@ type DashboardData = PortfolioDashboardData | AppDashboardData | null
 function App() {
   const [isVisible, setIsVisible] = useState(false)
   const [data, setData] = useState<DashboardData>(null)
+  const [updateInfo, setUpdateInfo] = useState<{
+    hasUpdate: boolean
+    latestVersion: string
+    currentVersion: string
+    releasesUrl: string
+  } | null>(null)
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
+
+  useEffect(() => {
+    // Check for updates on mount
+    ipcRenderer.invoke('check-for-update').then((result) => {
+        console.log('Update check result:', result)
+        if (result && result.hasUpdate) {
+            setUpdateInfo(result)
+            setShowUpdateModal(true)
+        }
+    }).catch(err => console.error('Auto update check failed:', err))
+  }, [])
 
   useEffect(() => {
     // Listen for data updates
     ipcRenderer.on('steam-data-update', (_event, newData) => {
       console.log('Received data:', newData)
-      // When data arrives, if we were not visible, we should probably become visible
-      // Or maybe the main process controls visibility via another channel?
-      // Actually main process manages the window visibility.
-      // But we can animate content entrance.
       setData(prev => ({ ...(prev ?? {}), ...newData }))
       setIsVisible(true)
     })
@@ -65,6 +80,7 @@ function App() {
     })
 
     ipcRenderer.on('steam-wishlist-update', (_event, { appId, wishlist, currentOutstanding }) => {
+      console.log('Received wishlist update')
       setData(prev => {
         if (prev && 'appId' in prev && prev.appId && appId && prev.appId !== appId) return prev
         return { ...(prev ?? {}), wishlistHistory: wishlist, currentOutstandingWishlist: currentOutstanding, appId }
@@ -73,13 +89,9 @@ function App() {
     })
 
     ipcRenderer.on('dashboard-visibility', (_event, visible) => {
+      console.log('Received dashboard visibility:', visible)
       setIsVisible(Boolean(visible))
     })
-
-    // Listen for close request from within React to trigger animation
-    // But closing is usually immediate via IPC.
-    // Let's make the main process wait for our animation? 
-    // Complicated. Let's just animate IN for now.
     
     return () => {
       ipcRenderer.removeAllListeners('steam-data-update')
@@ -117,10 +129,10 @@ function App() {
       <AnimatePresence>
         {isVisible && (
             <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
                 className="h-full w-full bg-black text-white"
             >
               {data?.type === 'portfolio' ? (
@@ -131,6 +143,16 @@ function App() {
             </motion.div>
         )}
       </AnimatePresence>
+
+      {updateInfo && (
+        <UpdateModal 
+            isOpen={showUpdateModal} 
+            onClose={() => setShowUpdateModal(false)}
+            latestVersion={updateInfo.latestVersion}
+            currentVersion={updateInfo.currentVersion}
+            releasesUrl={updateInfo.releasesUrl}
+        />
+      )}
     </div>
   )
 }

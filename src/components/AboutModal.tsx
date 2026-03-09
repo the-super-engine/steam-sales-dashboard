@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Github, ExternalLink, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { ipcRenderer } from 'electron'
+import { translations, type Locale } from '../lib/locales'
 
 interface AboutModalProps {
   isOpen: boolean
   onClose: () => void
-  locale: 'en' | 'zh-CN'
+  locale: Locale
 }
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'latest' | 'error'
@@ -17,6 +18,8 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
   const [latestVersion, setLatestVersion] = useState<string | null>(null)
   const [releasesUrl, setReleasesUrl] = useState<string>('')
   
+  const t = translations[locale]
+
   useEffect(() => {
     if (isOpen) {
         setUpdateStatus('idle')
@@ -42,44 +45,6 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
         setUpdateStatus('error')
     }
   }
-
-  const copy = locale === 'zh-CN' 
-    ? {
-        title: '关于 Steam Sales Dashboard',
-        desc: '本应用是帮助 Steam 应用/游戏开发者更好查看销量数据的 Dashboard。',
-        features: [
-            '专为发布日大屏监控设计',
-            '支持多应用实时监控',
-            '完全本地化运行，数据安全',
-            '提供中英文双语支持'
-        ],
-        disclaimer: '免责声明：本应用与 Valve 或 Steam 无任何关联。',
-        github: '开源仓库',
-        website: '访问官网',
-        checkUpdate: '检查更新',
-        checking: '检查中...',
-        updateAvailable: '发现新版本',
-        latest: '已是最新',
-        error: '检查失败'
-      }
-    : {
-        title: 'About Steam Sales Dashboard',
-        desc: 'A modern dashboard helping Steam app/game developers visualize sales data effectively.',
-        features: [
-            'Designed for Launch Day Big Screens',
-            'Multi-App Real-time Monitoring',
-            'Runs locally, keeping your data safe',
-            'Bilingual Support (English & Chinese)'
-        ],
-        disclaimer: 'Disclaimer: This application is not affiliated with Valve or Steam.',
-        github: 'GitHub Repo',
-        website: 'Website',
-        checkUpdate: 'Check Updates',
-        checking: 'Checking...',
-        updateAvailable: 'Update Available',
-        latest: 'Up to Date',
-        error: 'Check Failed'
-    }
 
   return (
     <AnimatePresence>
@@ -121,13 +86,13 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
                                 className="text-xs font-mono text-gray-500 hover:text-white flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-white/5"
                             >
                                 <RefreshCw className="w-3 h-3" />
-                                {copy.checkUpdate}
+                                {t.checkUpdate}
                             </button>
                         )}
                         {updateStatus === 'checking' && (
                             <div className="text-xs font-mono text-gray-500 flex items-center gap-1 animate-pulse px-2 py-1">
                                 <RefreshCw className="w-3 h-3 animate-spin" />
-                                {copy.checking}
+                                {t.checking}
                             </div>
                         )}
                         {updateStatus === 'available' && (
@@ -138,31 +103,31 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
                                 className="text-xs font-mono text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20"
                             >
                                 <ExternalLink className="w-3 h-3" />
-                                {copy.updateAvailable} {latestVersion && `(${latestVersion})`}
+                                {t.updateAvailable} {latestVersion && `(${latestVersion})`}
                             </a>
                         )}
                         {updateStatus === 'latest' && (
                             <div className="text-xs font-mono text-gray-500 flex items-center gap-1 px-2 py-1">
                                 <CheckCircle className="w-3 h-3" />
-                                {copy.latest} {latestVersion && `(${latestVersion})`}
+                                {t.latest} {latestVersion && `(${latestVersion})`}
                             </div>
                         )}
                         {updateStatus === 'error' && (
                             <div className="text-xs font-mono text-red-400 flex items-center gap-1 px-2 py-1">
                                 <AlertCircle className="w-3 h-3" />
-                                {copy.error}
+                                {t.error}
                             </div>
                         )}
                     </div>
                 </div>
                 
-                <h2 className="text-2xl font-bold text-white mb-2">{copy.title}</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">{t.aboutTitle}</h2>
                 <p className="text-gray-400 mb-6 leading-relaxed">
-                    {copy.desc}
+                    {t.aboutDesc}
                 </p>
 
                 <div className="space-y-3 mb-8">
-                    {copy.features.map((feature, i) => (
+                    {t.aboutFeatures.map((feature, i) => (
                         <div key={i} className="flex items-center gap-3 text-sm text-gray-300">
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
                             {feature}
@@ -172,7 +137,7 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
 
                 <div className="p-4 bg-black/30 rounded-lg border border-white/5 mb-8">
                     <p className="text-xs text-gray-500 text-center">
-                        {copy.disclaimer}
+                        {t.disclaimer}
                     </p>
                 </div>
 
@@ -184,7 +149,7 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors"
                     >
                         <Github className="w-4 h-4" />
-                        {copy.github}
+                        {t.github}
                     </a>
                     {/* If English, maybe link to Chinese readme as requested? 
                         The user said: "英文的链到中文的那个 readme 去"

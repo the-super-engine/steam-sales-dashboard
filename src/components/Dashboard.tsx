@@ -11,6 +11,7 @@ import ErrorBoundary from './ErrorBoundary'
 import AdvancedInsights from './AdvancedInsights'
 import WishlistInsights from './WishlistInsights'
 import AboutModal from './AboutModal'
+import { translations, type Locale } from '../lib/locales'
 
 interface DashboardProps {
   data: {
@@ -51,9 +52,9 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
     return 'mono'
   })
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
-  const [locale, setLocale] = useState<'en' | 'zh-CN'>(() => {
+  const [locale, setLocale] = useState<Locale>(() => {
     const saved = window.localStorage.getItem('dashboard.locale')
-    if (saved === 'en' || saved === 'zh-CN') return saved
+    if (saved === 'en' || saved === 'zh-CN') return saved as Locale
     return 'en'
   })
   const [localeMenuOpen, setLocaleMenuOpen] = useState(false)
@@ -61,6 +62,8 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
   const [utcNow, setUtcNow] = useState(new Date())
   const [showNoDataHint, setShowNoDataHint] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+
+  const t = translations[locale]
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true)
@@ -152,62 +155,6 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
       panelBg: 'bg-amber-950/20'
     }
   }[theme]
-
-  const copy = locale === 'zh-CN'
-    ? {
-        lastUpdated: '最后更新',
-        utcNow: 'UTC 当前',
-        dayReset: '距日重置',
-        nextRefresh: '下次刷新',
-        projected: '今日预计收盘',
-        trending: '趋势上升',
-        revenueToday: '今日收入',
-        unitsSold: '今日销量',
-        wishlists: '愿望单',
-        activeUsers: '活跃用户',
-        totalRevenueNet: '总收入（净）',
-        totalUnits: '总销量',
-        currentPlayers: '当前玩家',
-        grossRevenue: '总收入（毛）',
-        currentOutstanding: '当前待实现愿望单',
-        wishlistTotal: '愿望单总量',
-        todayUnits: '今日销量',
-        sales: '销量',
-        wishlist: '愿望单',
-        waitingSales: '等待历史销量数据',
-        waitingWishlist: '等待愿望单数据',
-        waitingSalesDesc: '后台正在抓取销量历史数据，请稍候。',
-        waitingWishlistDesc: '后台正在抓取愿望单 CSV 数据，请稍候。',
-        slowHint: '数据抓取时间较长，请先关闭 dashboard，检查外部 Steamworks 页面状态或登录态后再重开。',
-        back: '返回列表'
-      }
-    : {
-        lastUpdated: 'Last updated',
-        utcNow: 'UTC NOW',
-        dayReset: 'DAY RESET IN',
-        nextRefresh: 'UPDATE IN',
-        projected: 'Projected End of Day',
-        trending: 'Trending Up',
-        revenueToday: 'REVENUE (TODAY)',
-        unitsSold: 'UNITS SOLD',
-        wishlists: 'WISHLISTS',
-        activeUsers: 'ACTIVE USERS',
-        totalRevenueNet: 'Total Revenue (Net)',
-        totalUnits: 'Total Units',
-        currentPlayers: 'Current Players',
-        grossRevenue: 'Gross Revenue',
-        currentOutstanding: 'Current Outstanding',
-        wishlistTotal: 'Wishlist Total',
-        todayUnits: 'Today Units',
-        sales: 'sales',
-        wishlist: 'wishlist',
-        waitingSales: 'Waiting for Historical Data',
-        waitingWishlist: 'Waiting for Wishlist Data',
-        waitingSalesDesc: 'The background process is fetching your sales history. This may take a moment.',
-        waitingWishlistDesc: 'The background process is fetching wishlist CSV data. This may take a moment.',
-        slowHint: 'Data fetch is taking longer than expected. Please close dashboard and check the external Steamworks page status/login, then reopen.',
-        back: 'Back to List'
-      }
 
   const currentOutstandingDisplay = (() => {
     if ((data?.currentOutstandingWishlist ?? 0) > 0) return data?.currentOutstandingWishlist ?? 0
@@ -350,7 +297,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                <div className="flex items-center gap-3 mb-2">
                  <span className={cn('w-2 h-2 rounded-full animate-pulse', themeStyles.accentBg)}></span>
                  <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">
-                   {copy.lastUpdated}: {format(lastUpdated, 'HH:mm:ss')}
+                   {t.lastUpdated}: {format(lastUpdated, 'HH:mm:ss')}
                  </span>
                </div>
                <h1 className="text-3xl md:text-4xl font-black leading-none uppercase tracking-normal">
@@ -362,9 +309,9 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
              {/* @ts-ignore */}
              <div className="mt-2 inline-flex items-center gap-2 bg-black/50 rounded-full text-[11px] font-mono text-gray-300 relative group z-[60]" style={{ WebkitAppRegion: 'no-drag' }}>
               <Clock3 className="w-3.5 h-3.5" />
-              <span>{copy.utcNow} {getUtcResetInfo().now}</span>
+              <span>{t.utcNow} {getUtcResetInfo().now}</span>
               <span className="text-gray-500">|</span>
-              <span>{copy.dayReset} {getUtcResetInfo().countdown}</span>
+              <span>{t.dayReset} {getUtcResetInfo().countdown}</span>
               {utcNow.getUTCHours() < 5 && (
                  <div className="flex items-center gap-1 ml-1 text-yellow-500/80 cursor-help">
                     <span className="text-gray-500">|</span>
@@ -456,7 +403,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 ))}
              </div>
              <span className="text-[11px] font-mono text-gray-400">
-               {copy.nextRefresh} {getNextRefreshCountdown()}
+               {t.nextRefresh} {getNextRefreshCountdown()}
              </span>
 
              <button 
@@ -473,10 +420,10 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
              <button
                 onClick={onBack}
                 className={cn('flex items-center gap-2 px-3 h-11 border rounded-full transition-colors bg-black/40 hover:bg-white/10 cursor-pointer', themeStyles.panelBorder)}
-                title="Back to List"
+                title="ALL APPS"
              >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="text-xs font-mono">{copy.back}</span>
+                <span className="text-xs font-mono">{t.back}</span>
              </button>
 
              <button
@@ -501,7 +448,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
           <>
             <div className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border mb-12', themeStyles.panelBorder)}>
               <StatCard 
-                label={copy.revenueToday}
+                label={t.revenueToday}
                 value={parseCurrency(data.todayRevenue)} 
                 prefix="$"
                 delay={0}
@@ -512,7 +459,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 panelBg={themeStyles.panelBg}
               />
               <StatCard 
-                label={copy.unitsSold}
+                label={t.unitsSold}
                 value={parseNumber(data.todayUnits)} 
                 delay={0.1}
                 borderClass={themeStyles.panelBorder}
@@ -521,7 +468,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 panelBg={themeStyles.panelBg}
               />
               <StatCard 
-                label={copy.wishlists}
+                label={t.wishlists}
                 value={parseNumber(data.wishlists)} 
                 delay={0.2}
                 borderClass={themeStyles.panelBorder}
@@ -530,7 +477,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 panelBg={themeStyles.panelBg}
               />
               <StatCard 
-                label={copy.activeUsers}
+                label={t.activeUsers}
                 value={parseNumber(data.dailyActiveUsers) || parseNumber(data.currentPlayers)} 
                 delay={0.3}
                 highlight
@@ -550,7 +497,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 <div className={cn('p-6 relative overflow-hidden group h-full flex flex-col justify-between border', themeStyles.panelBorder, themeStyles.panelBg)}>
                     <div className="relative z-10">
                         <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-sm font-bold uppercase tracking-widest">{copy.projected}</h3>
+                            <h3 className="text-sm font-bold uppercase tracking-widest">{t.projected}</h3>
                             <ArrowUpRight className="w-5 h-5" />
                         </div>
                         <div className="text-5xl font-bold mb-2 tracking-tighter">
@@ -558,7 +505,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                         </div>
                         <div className={cn('inline-flex items-center gap-2 px-2 py-1 text-xs font-bold uppercase', themeStyles.accentBg, themeStyles.accentText)}>
                             <TrendingUp className="w-3 h-3" />
-                            {copy.trending}
+                            {t.trending}
                         </div>
                     </div>
                     <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-gray-200 rounded-full blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
@@ -566,26 +513,26 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
 
                 <div className="lg:col-span-2 grid grid-cols-2 gap-4">
                     <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.totalRevenueNet}</div>
+                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.totalRevenueNet}</div>
                         <div className="text-3xl font-bold font-mono tracking-tight">
                             $<CountUp end={parseCurrency(data.lifetimeRevenueNet)} separator="," />
                         </div>
                     </div>
                     <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.totalUnits}</div>
+                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.totalUnits}</div>
                         <div className="text-3xl font-bold font-mono tracking-tight">
                             <CountUp end={parseNumber(data.lifetimeUnits)} separator="," />
                         </div>
                     </div>
                     <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.currentPlayers}</div>
+                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.currentPlayers}</div>
                         <div className="text-3xl font-bold font-mono tracking-tight flex items-center gap-2">
                             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                             <CountUp end={parseNumber(data.currentPlayers)} separator="," />
                         </div>
                     </div>
                     <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.grossRevenue}</div>
+                        <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.grossRevenue}</div>
                         <div className="text-3xl font-bold font-mono tracking-tight">
                             $<CountUp end={parseCurrency(data.lifetimeRevenueGross)} separator="," />
                         </div>
@@ -596,25 +543,25 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
             <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.currentOutstanding}</div>
+              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.currentOutstanding}</div>
                 <div className="text-3xl font-bold font-mono tracking-tight">
                 <CountUp end={currentOutstandingDisplay} separator="," />
               </div>
             </div>
             <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.wishlistTotal}</div>
+              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.wishlistTotal}</div>
               <div className="text-3xl font-bold font-mono tracking-tight">
                 <CountUp end={parseNumber(data.wishlists)} separator="," />
               </div>
             </div>
             <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.todayUnits}</div>
+              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.todayUnits}</div>
               <div className="text-3xl font-bold font-mono tracking-tight">
                 <CountUp end={parseNumber(data.todayUnits)} separator="," />
               </div>
             </div>
             <div className={cn('p-6 border backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
-              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{copy.currentPlayers}</div>
+              <div className="text-gray-500 font-mono text-xs uppercase mb-2">{t.currentPlayers}</div>
               <div className="text-3xl font-bold font-mono tracking-tight">
                 <CountUp end={parseNumber(data.currentPlayers)} separator="," />
               </div>
@@ -632,7 +579,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 activeTab === tab ? cn(themeStyles.accentBg, themeStyles.accentText) : 'text-gray-400 hover:text-white'
               )}
             >
-              {tab === 'sales' ? copy.sales : copy.wishlist}
+              {tab === 'sales' ? t.sales : t.wishlist}
             </button>
           ))}
         </div>
@@ -647,7 +594,7 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
             {activeTab === 'sales' && data.history && data.history.length > 0 ? (
                 <>
                     <ErrorBoundary componentName="SalesAnalysis">
-                        <SalesAnalysis history={data.history} />
+                        <SalesAnalysis history={data.history} locale={locale} />
                     </ErrorBoundary>
                     <ErrorBoundary componentName="ExtendedMetrics">
                         <ExtendedMetrics history={data.history} />
@@ -664,16 +611,16 @@ export default function Dashboard({ data, onClose, onBack }: DashboardProps) {
                 <div className={cn('border p-12 text-center backdrop-blur-sm', themeStyles.panelBorder, themeStyles.panelBg)}>
                     <Activity className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                     <h3 className="text-xl font-bold mb-2">
-                      {activeTab === 'sales' ? copy.waitingSales : copy.waitingWishlist}
+                      {activeTab === 'sales' ? t.waitingSales : t.waitingWishlist}
                     </h3>
                     <p className="text-gray-500 max-w-md mx-auto">
                         {activeTab === 'sales'
-                          ? copy.waitingSalesDesc
-                          : copy.waitingWishlistDesc}
+                          ? t.waitingSalesDesc
+                          : t.waitingWishlistDesc}
                     </p>
                     {showNoDataHint && (
                       <p className="text-amber-300 text-sm mt-4 font-mono">
-                        {copy.slowHint}
+                        {t.slowHint}
                       </p>
                     )}
                 </div>

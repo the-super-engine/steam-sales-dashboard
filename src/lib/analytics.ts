@@ -5,15 +5,28 @@ export interface DataPoint {
   value: number
 }
 
-export type TimeRange = '7D' | '30D' | '90D' | '1Y' | 'ALL'
+export type TimeRange = '7D' | '30D' | '90D' | '1Y' | 'ALL' | 'CUSTOM'
 export type Granularity = 'day' | 'week' | 'month'
 
-export function filterData(data: DataPoint[], range: TimeRange): DataPoint[] {
+export function filterData(data: DataPoint[], range: TimeRange, customRange?: { from?: Date, to?: Date }): DataPoint[] {
   if (!data || !Array.isArray(data) || data.length === 0) return []
   if (range === 'ALL') return data
 
   const now = new Date()
   let cutoffDate = new Date()
+
+  if (range === 'CUSTOM') {
+    if (!customRange?.from || !customRange?.to) return data // Return all if incomplete
+    const from = new Date(customRange.from)
+    const to = new Date(customRange.to)
+    // Set to end of day
+    to.setHours(23, 59, 59, 999)
+    
+    return data.filter(d => {
+      const date = new Date(d.date)
+      return !isNaN(date.getTime()) && date >= from && date <= to
+    })
+  }
 
   switch (range) {
     case '7D':

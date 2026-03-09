@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Heart } from 'lucide-react'
+import { translations, type Locale } from '../lib/locales'
 
 type WishlistPoint = {
   date: string
@@ -14,32 +15,12 @@ type WishlistPoint = {
 
 interface WishlistInsightsProps {
   history: WishlistPoint[]
-  locale?: 'en' | 'zh-CN'
+  locale?: Locale
   currentOutstanding?: number | null
 }
 
 export default function WishlistInsights({ history, locale = 'en', currentOutstanding = null }: WishlistInsightsProps) {
-  const copy = locale === 'zh-CN'
-    ? {
-        flow: '愿望单流入流出',
-        momentum: '净变化动量',
-        weekly: '每周新增分布',
-        trend: '待实现愿望单趋势',
-        currentOutstanding: '当前待实现愿望单',
-        totalAdditions: '总新增',
-        totalOutflow: '总流失',
-        netChange: '净变化'
-      }
-    : {
-        flow: 'WISHLIST FLOW',
-        momentum: 'Net Wishlist Momentum',
-        weekly: 'Weekly Additions Pattern',
-        trend: 'Outstanding Wishlist Trend',
-        currentOutstanding: 'Current Outstanding',
-        totalAdditions: 'Total Additions',
-        totalOutflow: 'Total Outflow',
-        netChange: 'Net Change'
-      }
+  const t = translations[locale]
   const [range, setRange] = useState<'30D' | '90D' | '180D' | 'ALL'>('90D')
   const [minDailyAdds, setMinDailyAdds] = useState(0)
 
@@ -115,19 +96,19 @@ export default function WishlistInsights({ history, locale = 'en', currentOutsta
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="p-4 border border-white/10 bg-black/40 backdrop-blur-sm">
-          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{copy.currentOutstanding}</div>
+          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{t.currentOutstanding}</div>
           <div className="text-2xl font-bold">{currentOutstandingValue.toLocaleString()}</div>
         </div>
         <div className="p-4 border border-white/10 bg-black/40 backdrop-blur-sm">
-          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{copy.totalAdditions}</div>
+          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{t.totalAdditions}</div>
           <div className="text-2xl font-bold text-emerald-300">{totals.additions.toLocaleString()}</div>
         </div>
         <div className="p-4 border border-white/10 bg-black/40 backdrop-blur-sm">
-          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{copy.totalOutflow}</div>
+          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{t.totalOutflow}</div>
           <div className="text-2xl font-bold text-rose-300">{totals.outflow.toLocaleString()}</div>
         </div>
         <div className="p-4 border border-white/10 bg-black/40 backdrop-blur-sm">
-          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{copy.netChange}</div>
+          <div className="text-xs text-gray-500 font-mono uppercase mb-1">{t.netChange}</div>
           <div className={`text-2xl font-bold ${totals.net >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
             {totals.net >= 0 ? '+' : ''}{totals.net.toLocaleString()}
           </div>
@@ -137,7 +118,7 @@ export default function WishlistInsights({ history, locale = 'en', currentOutsta
       <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
         <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
           <Heart className="w-5 h-5" />
-          {copy.flow}
+          {t.wishlistFlow}
         </h3>
         <div className="h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -159,7 +140,7 @@ export default function WishlistInsights({ history, locale = 'en', currentOutsta
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-          <h3 className="text-lg font-bold mb-6">{copy.momentum}</h3>
+          <h3 className="text-lg font-bold mb-6">{t.wishlistMomentum}</h3>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
@@ -178,7 +159,7 @@ export default function WishlistInsights({ history, locale = 'en', currentOutsta
         </div>
 
         <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-          <h3 className="text-lg font-bold mb-6">{copy.weekly}</h3>
+          <h3 className="text-lg font-bold mb-6">{t.weeklyPattern}</h3>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weekdayBars}>
@@ -198,7 +179,7 @@ export default function WishlistInsights({ history, locale = 'en', currentOutsta
       </div>
 
       <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-        <h3 className="text-lg font-bold mb-6">{copy.trend}</h3>
+        <h3 className="text-lg font-bold mb-6">{t.wishlistTrend}</h3>
         <div className="h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
