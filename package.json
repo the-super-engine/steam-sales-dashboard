@@ -6,7 +6,7 @@
   "author": "Jeff @ Soda Game Studio",
   "main": "dist-electron/main.js",
   "build": {
-    "appId": "com.steamsales.dashboard",
+    "appId": "com.sodagame.steamdashboard",
     "productName": "Steam Sales Dashboard",
     "directories": {
       "output": "dist",

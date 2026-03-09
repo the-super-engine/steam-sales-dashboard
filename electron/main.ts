@@ -164,8 +164,9 @@ function createSteamView() {
 let dashboardActive = false
 let activeHistoryDownloadToken = 0
 let activeWishlistDownloadToken = 0
+let attemptedAllAppsRedirect = false
 
-function checkUrl() {
+async function checkUrl() {
   if (!steamView || steamView.webContents.isDestroyed()) return
   const url = steamView.webContents.getURL()
   console.log('Current URL:', url)
@@ -174,15 +175,17 @@ function checkUrl() {
     console.log('Login page detected. Hiding Dashboard to allow login.')
     setDashboardVisibility(false)
     autoOpenedOnLaunch = false
+    attemptedAllAppsRedirect = false
     win?.webContents.send('steam-target-detected', false)
     return
   }
 
   if (url === STEAM_ROOT_URL || url.startsWith(`${STEAM_ROOT_URL}home`)) {
-    console.log('Steam root/home detected. Redirecting to All Apps page.')
+    console.log('Steam root/home detected.')
     setDashboardVisibility(false)
     autoOpenedOnLaunch = false
-    if (steamView && !steamView.webContents.isDestroyed()) {
+    if (!attemptedAllAppsRedirect && steamView && !steamView.webContents.isDestroyed()) {
+      attemptedAllAppsRedirect = true
       steamView.webContents.loadURL(STEAM_ALL_APPS_URL)
     }
     return
@@ -194,6 +197,7 @@ function checkUrl() {
   console.log(`URL Analysis: isTarget=${isTarget}, isAllProducts=${isAllProducts}`)
 
   if (isTarget) {
+    attemptedAllAppsRedirect = false
     console.log('Target URL detected! Showing Dashboard option.')
     scrapeData()
     // Inject the Launch Dashboard button into the Steam page
@@ -217,6 +221,24 @@ function checkUrl() {
         fetchWishlist(appId);
     }
   } else if (isAllProducts) {
+    const inspection = await steamView.webContents.executeJavaScript(`
+      (function() {
+        const text = (document.body && document.body.innerText ? document.body.innerText : '').toLowerCase()
+        const gameLinks = document.querySelectorAll('a[href*="/app/details/"]').length
+        const hasNotFound = text.includes('file not found') || text.includes('not found')
+        return { gameLinks, hasNotFound }
+      })()
+    `).catch(() => ({ gameLinks: 0, hasNotFound: false }))
+    if (inspection.hasNotFound || inspection.gameLinks === 0) {
+      setDashboardVisibility(false)
+      autoOpenedOnLaunch = false
+      win?.webContents.send('steam-target-detected', false)
+      if (url.includes('/nav_games.php') && steamView && !steamView.webContents.isDestroyed()) {
+        steamView.webContents.loadURL(STEAM_ROOT_URL)
+      }
+      return
+    }
+    attemptedAllAppsRedirect = false
      console.log('All Products URL detected! Showing Portfolio Dashboard.')
      scrapePortfolioData()
     console.log('Sending show-dashboard-button to Steam View for Portfolio')
