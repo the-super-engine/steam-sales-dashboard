@@ -148,3 +148,5 @@ MIT
 
 ## Credits
 Powered by [Soda Game](https://soda-game.com) & [Vibart AI](https://vibart.ai)
+
+This App 99.99% Written by [TRAE AI](https://www.trae.ai/)

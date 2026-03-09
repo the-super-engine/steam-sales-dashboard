@@ -148,3 +148,5 @@ MIT
 
 ## 致谢
 Powered by [Soda Game](https://soda-game.com) & [Vibart AI](https://vibart.ai)
+
+本应用 99.99% 由 [TRAE AI](https://www.trae.ai/) 编写
