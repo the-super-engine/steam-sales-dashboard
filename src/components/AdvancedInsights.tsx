@@ -121,15 +121,15 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
   }, [heatmapDays, normalizedMap])
 
   return (
-    <div className="space-y-8">
-      <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+    <div className="space-y-4">
+      <div className="bg-black/40 border border-white/10 p-4 backdrop-blur-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <CalendarDays className="w-5 h-5" />
+            <h3 className="text-sm font-bold flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" />
               {t.heatmapTitle}
             </h3>
-            <p className="text-xs text-gray-500 font-mono mt-1">{t.heatmapDesc}</p>
+            <p className="text-[10px] text-gray-500 font-mono mt-0.5">{t.heatmapDesc}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-1">
@@ -224,40 +224,42 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-          <h4 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">{t.monthly}</h4>
-          <div className="h-[260px]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-black/40 border border-white/10 p-4 backdrop-blur-sm">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">{t.monthly}</h4>
+          <div className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthBars}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
-                <XAxis dataKey="month" stroke="#666" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
-                <YAxis stroke="#666" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                <XAxis dataKey="month" stroke="#555" tick={{ fontSize: 9, fontFamily: 'monospace' }} tickLine={false} axisLine={false} minTickGap={20} />
+                <YAxis stroke="#555" tick={{ fontSize: 9, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
                 <Tooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.08)' }}
                   contentStyle={{ backgroundColor: '#000', border: '1px solid #333', borderRadius: '4px' }}
-                  itemStyle={{ color: '#fff', fontFamily: 'monospace' }}
-                  labelStyle={{ color: '#888', marginBottom: '4px', fontSize: '10px' }}
+                  itemStyle={{ color: '#fff', fontFamily: 'monospace', fontSize: '11px' }}
+                  labelStyle={{ color: '#888', marginBottom: '2px', fontSize: '10px' }}
                 />
-                <Bar dataKey="value" fill="#fff" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="value" fill="#fff" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-black/40 border border-white/10 p-6 backdrop-blur-sm">
-          <h4 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">{t.weekday}</h4>
-          <div className="h-[260px]">
+        <div className="bg-black/40 border border-white/10 p-4 backdrop-blur-sm">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">{t.weekday}</h4>
+          <div className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weekdayBars}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
-                <XAxis dataKey="label" stroke="#666" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
-                <YAxis stroke="#666" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 9, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
+                <YAxis stroke="#555" tick={{ fontSize: 9, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
                 <Tooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.08)' }}
                   contentStyle={{ backgroundColor: '#000', border: '1px solid #333', borderRadius: '4px' }}
-                  itemStyle={{ color: '#fff', fontFamily: 'monospace' }}
-                  labelStyle={{ color: '#888', marginBottom: '4px', fontSize: '10px' }}
+                  itemStyle={{ color: '#fff', fontFamily: 'monospace', fontSize: '11px' }}
+                  labelStyle={{ color: '#888', marginBottom: '2px', fontSize: '10px' }}
                 />
-                <Bar dataKey="value" fill="#9ca3af" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="value" fill="#9ca3af" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

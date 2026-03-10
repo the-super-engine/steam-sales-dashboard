@@ -177,7 +177,7 @@ export default function SalesAnalysis({ history, locale = 'en' }: SalesAnalysisP
                         axisLine={false}
                     />
                     <Tooltip 
-                        cursor={{fill: 'rgba(255,255,255,0.05)'}}
+                        cursor={{fill: 'rgba(255,255,255,0.08)'}}
                         contentStyle={{backgroundColor: '#000', border: '1px solid #333', borderRadius: '4px'}}
                         itemStyle={{color: '#fff', fontFamily: 'monospace'}}
                         labelStyle={{color: '#888', marginBottom: '4px', fontSize: '10px'}}

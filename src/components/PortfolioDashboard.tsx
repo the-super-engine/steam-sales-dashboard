@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { X, TrendingUp, ArrowRight, Info, LogOut } from 'lucide-react'
 import CountUp from 'react-countup'
@@ -21,16 +21,19 @@ interface PortfolioData {
   totalUnits?: string
 }
 
-type PortfolioGame = PortfolioData['games'][number]
+type PortfolioGameItem = PortfolioData['games'][number]
 
 interface PortfolioDashboardProps {
   data: PortfolioData
+  portfolioAllHistory: PortfolioGameItem[] | null
   onClose: () => void
   onSelect: (appId: string) => void
+  onRequestAllHistory: () => void
 }
 
-export default function PortfolioDashboard({ data, onClose, onSelect }: PortfolioDashboardProps) {
+export default function PortfolioDashboard({ data, portfolioAllHistory, onClose, onSelect, onRequestAllHistory }: PortfolioDashboardProps) {
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [range, setRange] = useState<'today' | 'all-history'>('today')
   const [locale] = useState<Locale>(() => {
     const saved = window.localStorage.getItem('dashboard.locale')
     if (saved === 'en' || saved === 'zh-CN') return saved as Locale
@@ -38,17 +41,22 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
   })
   const t = translations[locale]
 
-  // Sort games by rank
-  const sortedGames = [...data.games].sort((a, b) => {
-    const rankA = parseInt(a.rank) || 999;
-    const rankB = parseInt(b.rank) || 999;
-    return rankA - rankB;
-  });
+  const isAllHistory = range === 'all-history'
+  const gamesToShow = isAllHistory ? (portfolioAllHistory ?? []) : data.games
+  const sortedGames = [...gamesToShow].sort((a, b) => {
+    const rankA = parseInt(a.rank) || 999
+    const rankB = parseInt(b.rank) || 999
+    return rankA - rankB
+  })
 
-  // Calculate total units
   const totalUnits = sortedGames.reduce((acc, game) => {
-    return acc + (parseInt(game.units.replace(/,/g, '')) || 0);
-  }, 0);
+    return acc + (parseInt(game.units.replace(/,/g, '')) || 0)
+  }, 0)
+
+  const handleRangeChange = (next: 'today' | 'all-history') => {
+    setRange(next)
+    if (next === 'all-history' && !portfolioAllHistory) onRequestAllHistory()
+  }
 
   const container = {
     hidden: { opacity: 0 },
@@ -63,10 +71,23 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
     show: { y: 0, opacity: 1 }
   }
 
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    const el = scrollRef.current
+    if (!el) return
+    const { scrollTop, scrollHeight, clientHeight } = el
+    const canScrollUp = scrollTop > 0 && e.deltaY < 0
+    const canScrollDown = scrollTop < scrollHeight - clientHeight - 1 && e.deltaY > 0
+    if (canScrollUp || canScrollDown) {
+      el.scrollTop += e.deltaY
+      e.preventDefault()
+    }
+  }, [])
+
   return (
-    <div className="relative min-h-screen bg-black text-white p-8 font-sans overflow-hidden selection:bg-white selection:text-black">
-      {/* Background Grid */}
-      <div className="absolute inset-0 z-0 bg-grid-pattern opacity-10 pointer-events-none"></div>
+    <div className="relative min-h-screen bg-black text-white font-sans overflow-hidden selection:bg-white selection:text-black">
+      {/* Background Grid - full bleed */}
+      <div className="absolute inset-0 z-0 bg-grid-pattern opacity-10 pointer-events-none" />
 
       {/* Draggable Region */}
       <div className="absolute top-0 left-0 right-0 h-8 z-50 pointer-events-none">
@@ -75,12 +96,18 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
         <div className="w-full h-full" style={{ WebkitAppRegion: 'drag' }} />
       </div>
 
-      <motion.div 
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="relative z-10 max-w-7xl mx-auto flex flex-col h-full pt-16 pb-20 overflow-y-auto"
+      {/* Full-viewport scroll layer: keeps 全屏 feel, content scrolls inside */}
+      <div
+        ref={scrollRef}
+        onWheel={handleWheel}
+        className="dashboard-scroll fixed inset-0 z-10 overflow-y-auto overscroll-behavior-y-contain"
       >
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="relative min-h-full max-w-7xl mx-auto flex flex-col p-8 pt-16 pb-20"
+        >
         {/* Header */}
         <motion.div variants={item} className="flex justify-between items-end mt-8 mb-12 border-b border-white/10 pb-8">
           <div>
@@ -104,12 +131,28 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
             </div>
             <div className="flex items-center gap-2 text-gray-400 font-mono text-sm">
               <TrendingUp className="w-4 h-4 text-white" />
-              {t.totalUnitsToday}: <span className="text-white font-bold"><CountUp end={totalUnits} duration={2} separator="," /></span>
+              {isAllHistory ? t.totalUnitsAllHistory : t.totalUnitsToday}: <span className="text-white font-bold"><CountUp end={totalUnits} duration={2} separator="," /></span>
             </div>
           </div>
-          
-          <div className="flex flex-col items-end gap-4 mb-4">
-            <button 
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center bg-black/50 backdrop-blur-md border border-white/10 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => handleRangeChange('today')}
+                className={`px-3 py-1.5 text-xs font-mono font-bold rounded transition-colors ${range === 'today' ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}`}
+              >
+                {t.portfolioRangeToday}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRangeChange('all-history')}
+                className={`px-3 py-1.5 text-xs font-mono font-bold rounded transition-colors ${range === 'all-history' ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}`}
+              >
+                {t.portfolioRangeAllHistory}
+              </button>
+            </div>
+            <button
                 onClick={onClose}
                 className="group relative w-12 h-12 flex items-center justify-center shrink-0 overflow-hidden border border-white/20 rounded-full hover:border-white transition-colors z-50"
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -125,11 +168,17 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
         <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} locale={locale} />
 
         {/* Games Grid - Selector Style */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {sortedGames.map((game) => (
-            <GameCard key={game.appId} game={game} onSelect={() => onSelect(game.appId)} locale={locale} />
-          ))}
-        </div>
+        {isAllHistory && !portfolioAllHistory ? (
+          <div className="py-16 text-center text-gray-400 font-mono text-sm">
+            {t.portfolioRangeAllHistory} …
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedGames.map((game) => (
+              <GameCard key={game.appId} game={game} onSelect={() => onSelect(game.appId)} locale={locale} showAllHistoryLabel={isAllHistory} />
+            ))}
+          </div>
+        )}
 
       {/* Footer */}
       <div className="mt-auto pt-16 flex flex-col items-center justify-center gap-6 pointer-events-auto pb-8">
@@ -168,15 +217,28 @@ export default function PortfolioDashboard({ data, onClose, onSelect }: Portfoli
             </a>
         </div>
       </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   )
 }
 
-function GameCard({ game, onSelect, locale }: { game: PortfolioGame, onSelect: () => void, locale: Locale }) {
+const STEAM_CDN = 'https://cdn.cloudflare.steamstatic.com/steam/apps'
+
+function GameCard({ game, onSelect, locale, showAllHistoryLabel }: { game: PortfolioGameItem, onSelect: () => void, locale: Locale, showAllHistoryLabel?: boolean }) {
   const units = parseInt(game.units.replace(/,/g, '')) || 0;
   const t = translations[locale]
-  
+  const [imgSrc, setImgSrc] = useState(`${STEAM_CDN}/${game.appId}/library_hero.jpg`)
+  const [noImage, setNoImage] = useState(false)
+
+  const handleImgError = () => {
+    if (imgSrc.includes('library_hero')) {
+      setImgSrc(`${STEAM_CDN}/${game.appId}/header.jpg`)
+    } else {
+      setNoImage(true)
+    }
+  }
+
   return (
     <motion.button 
       variants={{
@@ -186,21 +248,31 @@ function GameCard({ game, onSelect, locale }: { game: PortfolioGame, onSelect: (
       onClick={onSelect}
       className="group relative bg-black border border-white/10 overflow-hidden h-[240px] hover:border-white transition-colors w-full text-left focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black"
     >
-      {/* Background Image - Header/Library Hero */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-95 saturate-110"
-        style={{ 
-          // Use header image (capsule) for smaller cards if library hero is too big, but library hero usually looks better cropped
-          backgroundImage: `url(https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appId}/library_hero.jpg)` 
-        }}
-      />
+      {/* Background: image or gradient placeholder when no image */}
+      <div className="absolute inset-0 overflow-hidden">
+        {noImage ? (
+          <div
+            className="absolute inset-0 opacity-70 group-hover:opacity-90 transition-opacity"
+            style={{
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f0f1a 100%)',
+            }}
+          />
+        ) : (
+          <img
+            src={imgSrc}
+            alt=""
+            onError={handleImgError}
+            className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-95 saturate-110"
+          />
+        )}
+      </div>
       {/* Heavy gradient for text readability */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent group-hover:via-black/40 transition-colors"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent group-hover:via-black/40 transition-colors"></div>
 
       {/* Content */}
       <div className="absolute inset-0 p-6 flex flex-col justify-between z-10">
         <div className="flex justify-between items-start">
-           <div className="font-mono text-xs text-gray-300 bg-black/50 backdrop-blur-sm border border-white/10 px-2 py-1 rounded group-hover:bg-white group-hover:text-black transition-colors">
+           <div className="font-mono text-xs text-gray-300 bg-black/40 backdrop-blur-sm border border-white/10 px-2 py-1 rounded group-hover:bg-white group-hover:text-black transition-colors">
              {t.rank} #{game.rank}
            </div>
            {units > 0 && (
@@ -219,7 +291,7 @@ function GameCard({ game, onSelect, locale }: { game: PortfolioGame, onSelect: (
           <div className="flex justify-between items-end border-t border-white/20 pt-3 group-hover:border-white/50 transition-colors">
              <div>
                 <div className="text-xs text-gray-300 font-mono mb-0.5 uppercase">
-                  {t.unitsToday}
+                  {showAllHistoryLabel ? t.unitsAllHistory : t.unitsToday}
                 </div>
                 <div className="text-3xl font-bold tracking-tighter text-white">
                   <CountUp end={units} duration={1.5} separator="," />

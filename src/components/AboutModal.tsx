@@ -79,7 +79,7 @@ export default function AboutModal({ isOpen, onClose, locale }: AboutModalProps)
                     <img src={logo} alt="Steam Sales Dashboard" className="w-16 h-16 rounded-xl mb-6 shadow-lg object-cover" />
                     
                     {/* Update Checker */}
-                    <div className="flex flex-col items-end gap-2 mt-1">
+                    <div className="flex flex-col items-end gap-2 mt-10">
                         {updateStatus === 'idle' && (
                             <button 
                                 onClick={checkForUpdates}

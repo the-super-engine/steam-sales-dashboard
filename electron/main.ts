@@ -1,4 +1,4 @@
-import { app, BrowserWindow, BrowserView, ipcMain, session, shell, net, type DownloadItem, type WebContents, type Event as ElectronEvent } from 'electron'
+import { app, BrowserWindow, BrowserView, ipcMain, shell, net, globalShortcut, type WebContents } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { parse } from 'csv-parse/sync'
@@ -33,8 +33,9 @@ let autoOpenedOnLaunch = false
 function createWindow() {
   const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
   win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1400,
+    height: 900,
+    show: false, // Prevent black screen on Windows: show only after content is ready
     icon: path.join(process.env.PUBLIC ?? '', iconName),
     webPreferences: {
       preload: path.join(__dirname, '../dist-electron/preload.js'),
@@ -45,6 +46,22 @@ function createWindow() {
     titleBarStyle: 'hiddenInset', // Native-like dark bar on macOS
     trafficLightPosition: { x: 12, y: 12 }
   })
+
+  // On Windows, showing before render is ready causes black screen. Show only after first paint.
+  const showWindowWhenReady = () => {
+    if (!win || win.isDestroyed()) return
+    // Re-apply Steam view bounds so they're correct when window is shown (Windows layout timing)
+    if (steamView && !steamView.webContents.isDestroyed() && !dashboardActive) {
+      const bounds = win.getContentBounds()
+      if (bounds.width > 0 && bounds.height > 0) {
+        steamView.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height })
+      }
+    }
+    win.show()
+  }
+  win.once('ready-to-show', showWindowWhenReady)
+  // Fallback: if ready-to-show never fires (e.g. load error on Windows), show after delay
+  setTimeout(showWindowWhenReady, 8000)
 
   // Handle external links
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -162,7 +179,6 @@ function createSteamView() {
 }
 
 let dashboardActive = false
-let activeHistoryDownloadToken = 0
 let activeWishlistDownloadToken = 0
 let attemptedAllAppsRedirect = false
 
@@ -215,10 +231,9 @@ async function checkUrl() {
     const appId = match ? match[1] : null
     win?.webContents.send('steam-target-detected', appId)
 
-    // Trigger history fetch if we have an app ID
+    // Trigger history fetch; fetchWishlist is called after history completes to avoid backgroundView race
     if (appId) {
         fetchHistory(appId);
-        fetchWishlist(appId);
     }
   } else if (isAllProducts) {
     const inspection = await steamView.webContents.executeJavaScript(`
@@ -240,7 +255,7 @@ async function checkUrl() {
     }
     attemptedAllAppsRedirect = false
      console.log('All Products URL detected! Showing Portfolio Dashboard.')
-     scrapePortfolioData()
+     fetchPortfolioToday()
     console.log('Sending show-dashboard-button to Steam View for Portfolio')
     setTimeout(() => {
         if (!steamView || steamView.webContents.isDestroyed()) return
@@ -261,9 +276,331 @@ async function checkUrl() {
   }
 }
 
-const FETCH_COOLDOWN = 6 * 60 * 60 * 1000; // 6 hours (approx 3-4 times a day)
+const FETCH_COOLDOWN = 3 * 60 * 60 * 1000; // 3 hours: use cache within this window, skip re-download
 const HISTORY_FILE = path.join(app.getPath('userData'), 'steam-history.json');
 const WISHLIST_FILE = path.join(app.getPath('userData'), 'steam-wishlist.json');
+const PLAYTIME_FILE = path.join(app.getPath('userData'), 'steam-playtime.json');
+const PLAYERS_FILE = path.join(app.getPath('userData'), 'steam-players.json');
+const PORTFOLIO_TODAY_FILE = path.join(app.getPath('userData'), 'steam-portfolio-today.json');
+const PORTFOLIO_ALLHISTORY_FILE = path.join(app.getPath('userData'), 'steam-portfolio-allhistory.json');
+
+type PlaytimeRetentionRow = { threshold: string; minutes: number; percentage: number }
+type PlaytimeData = {
+  lifetimeUsers: number
+  avgMinutes: number
+  medianMinutes: number
+  rangeMinStr: string
+  rangeMaxStr: string
+  retention: PlaytimeRetentionRow[]
+}
+
+function loadPlaytimeStore(): Record<string, { lastUpdated: number; data: PlaytimeData }> {
+  try {
+    if (fs.existsSync(PLAYTIME_FILE)) return JSON.parse(fs.readFileSync(PLAYTIME_FILE, 'utf-8'))
+  } catch { /* ignore */ }
+  return {}
+}
+
+function savePlaytimeStore(store: Record<string, { lastUpdated: number; data: PlaytimeData }>) {
+  try { fs.writeFileSync(PLAYTIME_FILE, JSON.stringify(store, null, 2)) } catch { /* ignore */ }
+}
+
+/** Parse "X hours Y minutes" or "Y minutes" into total minutes */
+function parseMinutes(text: string): number {
+  const t = (text || '').trim()
+  const h = t.match(/(\d+)\s*hour/i)
+  const m = t.match(/(\d+)\s*min/i)
+  return (h ? parseInt(h[1]) * 60 : 0) + (m ? parseInt(m[1]) : 0)
+}
+
+function fetchPlaytime(appId: string) {
+  if (!backgroundView) { createBackgroundView(); if (!backgroundView) return }
+  const now = Date.now()
+  const store = loadPlaytimeStore()
+  const cached = store[appId]
+  if (cached && cached.data && (now - cached.lastUpdated < FETCH_COOLDOWN)) {
+    console.log(`[playtime] Serving cached data for ${appId} — triggering players`)
+    win?.webContents.send('steam-playtime-update', { appId, playtime: cached.data })
+    fetchPlayers(appId)
+    return
+  }
+
+  if (win) {
+    win.addBrowserView(backgroundView)
+    backgroundView.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+  }
+  const url = `https://partner.steampowered.com/app/playtime/${appId}/`
+  console.log(`[playtime] Fetching ${url}`)
+  backgroundView.webContents.removeAllListeners('did-finish-load')
+  backgroundView.webContents.loadURL(url)
+  backgroundView.webContents.once('did-finish-load', () => {
+    setTimeout(async () => {
+      try {
+        if (!backgroundView || backgroundView.webContents.isDestroyed()) return
+        const result = await backgroundView.webContents.executeJavaScript(`
+          (function() {
+            const getText = (el) => (el ? (el.innerText || el.textContent || '').trim() : '')
+            // Key stats table (first table)
+            let lifetimeUsers = 0, avgTime = '', medianTime = '', rangeMin = '', rangeMax = ''
+            const tables = document.querySelectorAll('table')
+            const firstTb = tables[0]
+            if (firstTb) {
+              const rows = firstTb.querySelectorAll('tr')
+              for (const row of rows) {
+                const tds = row.querySelectorAll('td')
+                if (tds.length < 2) continue
+                const label = getText(tds[0]).toLowerCase()
+                const val = getText(tds[1])
+                if (label.includes('lifetime users')) lifetimeUsers = parseInt(val.replace(/,/g,'')) || 0
+                else if (label.includes('average time')) avgTime = val
+                else if (label.includes('median time')) medianTime = val
+                else if (label.includes('time played range')) rangeMin = val
+              }
+              // The range max is on the next row (empty label)
+              for (let i = 0; i < rows.length - 1; i++) {
+                const tds = rows[i].querySelectorAll('td')
+                if (tds.length >= 1 && getText(tds[0]).toLowerCase().includes('time played range')) {
+                  const nextTds = rows[i+1]?.querySelectorAll('td') || []
+                  if (nextTds.length >= 2) rangeMax = getText(nextTds[1])
+                }
+              }
+            }
+            // Retention table (second table with thead)
+            const retention = []
+            for (const table of tables) {
+              const thead = table.querySelector('thead')
+              if (!thead) continue
+              const bodyRows = table.querySelectorAll('tbody tr')
+              for (const row of bodyRows) {
+                const tds = row.querySelectorAll('td')
+                if (tds.length < 2) continue
+                const threshold = getText(tds[0])
+                const pct = parseInt(getText(tds[1]).replace('%','')) || 0
+                retention.push({ threshold, percentage: pct })
+              }
+              break
+            }
+            return { lifetimeUsers, avgTime, medianTime, rangeMin, rangeMax, retention }
+          })()
+        `)
+        if (!result || !result.lifetimeUsers) {
+          console.error('[playtime] Failed to parse playtime page for', appId)
+          return
+        }
+        // Convert threshold strings to minutes for charting
+        const thresholdMinutes: Record<string, number> = {
+          '10 minutes': 10, '30 minutes': 30, '1 hour 0 minutes': 60,
+          '2 hours 0 minutes': 120, '5 hours 0 minutes': 300,
+          '10 hours 0 minutes': 600, '20 hours 0 minutes': 1200,
+          '50 hours 0 minutes': 3000, '100 hours 0 minutes': 6000,
+        }
+        const retention: PlaytimeRetentionRow[] = (result.retention || []).map((r: { threshold: string; percentage: number }) => ({
+          threshold: r.threshold,
+          minutes: thresholdMinutes[r.threshold] ?? parseMinutes(r.threshold),
+          percentage: r.percentage,
+        }))
+        const data: PlaytimeData = {
+          lifetimeUsers: result.lifetimeUsers,
+          avgMinutes: parseMinutes(result.avgTime),
+          medianMinutes: parseMinutes(result.medianTime),
+          rangeMinStr: result.rangeMin,
+          rangeMaxStr: result.rangeMax,
+          retention,
+        }
+        store[appId] = { lastUpdated: Date.now(), data }
+        savePlaytimeStore(store)
+        console.log(`[playtime] Saved playtime for ${appId}: users=${data.lifetimeUsers} avg=${data.avgMinutes}m median=${data.medianMinutes}m retention=${retention.length} rows`)
+        win?.webContents.send('steam-playtime-update', { appId, playtime: data })
+        // Chain players fetch after playtime (serial to avoid backgroundView race)
+        fetchPlayers(appId)
+      } catch (e) {
+        console.error('[playtime] Error:', e)
+        fetchPlayers(appId)
+      }
+    }, 2000)
+  })
+}
+
+type PlayerHistoryPoint = { date: string; value: number }
+type PlayerSummary = {
+  currentPlayers: number
+  lifetimeAvgDAU: number
+  recentAvgDAU: number
+  avgPeakConcurrent: number
+  maxPeakConcurrent: number
+  avgDAU: number
+  maxDAU: number
+  avgSteamDeck: number
+  maxSteamDeck: number
+}
+type PlayersData = {
+  summary: PlayerSummary
+  peakConcurrent: PlayerHistoryPoint[]
+  dailyActive: PlayerHistoryPoint[]
+}
+
+function loadPlayersStore(): Record<string, { lastUpdated: number; data: PlayersData }> {
+  try {
+    if (fs.existsSync(PLAYERS_FILE)) return JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf-8'))
+  } catch { /* ignore */ }
+  return {}
+}
+
+function savePlayersStore(store: Record<string, { lastUpdated: number; data: PlayersData }>) {
+  try { fs.writeFileSync(PLAYERS_FILE, JSON.stringify(store, null, 2)) } catch { /* ignore */ }
+}
+
+function fetchPlayers(appId: string) {
+  if (!backgroundView) { createBackgroundView(); if (!backgroundView) return }
+  const now = Date.now()
+  const store = loadPlayersStore()
+  const cached = store[appId]
+  if (cached && cached.data && (now - cached.lastUpdated < FETCH_COOLDOWN)) {
+    console.log(`[players] Serving cached data for ${appId}`)
+    win?.webContents.send('steam-players-update', { appId, players: cached.data })
+    return
+  }
+
+  if (win) {
+    win.addBrowserView(backgroundView)
+    backgroundView.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+  }
+  const url = `https://partner.steampowered.com/app/players/${appId}/`
+  console.log(`[players] Fetching ${url}`)
+  backgroundView.webContents.removeAllListeners('did-finish-load')
+  backgroundView.webContents.loadURL(url)
+  backgroundView.webContents.once('did-finish-load', () => {
+    setTimeout(async () => {
+      try {
+        if (!backgroundView || backgroundView.webContents.isDestroyed()) return
+
+        // Step 1: Find and navigate to "All History" link to ensure full dataset
+        const allHistoryHref: string | null = await backgroundView.webContents.executeJavaScript(`
+          (function() {
+            const links = Array.from(document.querySelectorAll('a'))
+            const el = links.find(a => /all.{0,5}history/i.test((a.textContent || '').trim()))
+            return el ? el.href : null
+          })()
+        `)
+        if (allHistoryHref) {
+          console.log(`[players] Navigating to All History: ${allHistoryHref}`)
+          backgroundView.webContents.removeAllListeners('did-finish-load')
+          backgroundView.webContents.loadURL(allHistoryHref)
+          await new Promise<void>(resolve => backgroundView!.webContents.once('did-finish-load', resolve))
+          await new Promise(r => setTimeout(r, 1500))
+        } else {
+          console.log('[players] All History link not found, scraping default page')
+        }
+
+        if (!backgroundView || backgroundView.webContents.isDestroyed()) return
+        const result = await backgroundView.webContents.executeJavaScript(`
+          (function() {
+            const getText = (el) => (el ? (el.innerText || el.textContent || '').trim() : '')
+            const parseNum = (s) => parseInt((s || '').replace(/[^0-9]/g, '')) || 0
+
+            // Summary stats from tables
+            let currentPlayers = 0, lifetimeAvgDAU = 0, recentAvgDAU = 0
+            let avgPeakConcurrent = 0, maxPeakConcurrent = 0, avgDAU = 0, maxDAU = 0
+            let avgSteamDeck = 0, maxSteamDeck = 0
+
+            for (const row of document.querySelectorAll('table tr')) {
+              const tds = row.querySelectorAll('td')
+              if (tds.length < 2) continue
+              const label = getText(tds[0]).toLowerCase()
+              // Find rightmost non-empty td (All History column)
+              let valTd = null
+              for (let i = tds.length - 1; i >= 1; i--) {
+                const t = getText(tds[i])
+                if (t && /\\d/.test(t)) { valTd = tds[i]; break }
+              }
+              if (!valTd) continue
+              const val = parseNum(getText(valTd))
+              if (label.includes('current players')) currentPlayers = val
+              else if (label.includes('lifetime avg daily active')) lifetimeAvgDAU = val
+              else if (label.includes('recent avg daily active')) recentAvgDAU = val
+              else if (label.includes('average daily peak concurrent')) avgPeakConcurrent = val
+              else if (label.includes('maximum daily peak concurrent')) maxPeakConcurrent = val
+              else if (label.includes('average daily active users')) avgDAU = val
+              else if (label.includes('maximum daily active users')) maxDAU = val
+              else if (label.includes('average daily steam deck')) avgSteamDeck = val
+              else if (label.includes('maximum daily steam deck')) maxSteamDeck = val
+            }
+
+            // Extract time series from inline <script> tags
+            let peakConcurrent = []
+            let dailyActive = []
+            for (const script of document.querySelectorAll('script')) {
+              const text = script.textContent || ''
+              if (!text.includes("'user_graph'")) continue
+              // Find start of data array after 'user_graph' ,
+              const marker = text.indexOf("'user_graph'")
+              if (marker < 0) continue
+              const dataStart = text.indexOf('[', marker + 12)
+              if (dataStart < 0) continue
+              // Match balanced brackets to get full data array
+              let depth = 0, endIdx = dataStart
+              for (let i = dataStart; i < text.length; i++) {
+                if (text[i] === '[') depth++
+                else if (text[i] === ']') { depth--; if (depth === 0) { endIdx = i; break } }
+              }
+              try {
+                const parsed = JSON.parse(text.slice(dataStart, endIdx + 1))
+                if (Array.isArray(parsed) && parsed.length >= 2) {
+                  peakConcurrent = parsed[0].map(p => ({ date: p[0], value: p[1] }))
+                  dailyActive = parsed[1].map(p => ({ date: p[0], value: p[1] }))
+                }
+              } catch (e) { /* parse failed */ }
+              break
+            }
+
+            return { currentPlayers, lifetimeAvgDAU, recentAvgDAU, avgPeakConcurrent, maxPeakConcurrent, avgDAU, maxDAU, avgSteamDeck, maxSteamDeck, peakConcurrent, dailyActive }
+          })()
+        `)
+        if (!result) {
+          console.error('[players] Failed to parse players page for', appId)
+          return
+        }
+        const data: PlayersData = {
+          summary: {
+            currentPlayers: result.currentPlayers,
+            lifetimeAvgDAU: result.lifetimeAvgDAU,
+            recentAvgDAU: result.recentAvgDAU,
+            avgPeakConcurrent: result.avgPeakConcurrent,
+            maxPeakConcurrent: result.maxPeakConcurrent,
+            avgDAU: result.avgDAU,
+            maxDAU: result.maxDAU,
+            avgSteamDeck: result.avgSteamDeck,
+            maxSteamDeck: result.maxSteamDeck,
+          },
+          peakConcurrent: result.peakConcurrent || [],
+          dailyActive: result.dailyActive || [],
+        }
+        store[appId] = { lastUpdated: Date.now(), data }
+        savePlayersStore(store)
+        console.log(`[players] Saved for ${appId}: peak=${data.summary.maxPeakConcurrent} maxDAU=${data.summary.maxDAU} series=${data.peakConcurrent.length}pts`)
+        win?.webContents.send('steam-players-update', { appId, players: data })
+      } catch (e) {
+        console.error('[players] Error:', e)
+      }
+    }, 2000)
+  })
+}
+
+type PortfolioGame = { name: string; appId: string; rank: string; units: string }
+type PortfolioCacheEntry = { lastUpdated: number; games: PortfolioGame[]; title?: string; totalUnits?: string }
+
+function loadPortfolioCache(filePath: string): PortfolioCacheEntry | null {
+  try {
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+  } catch { /* ignore */ }
+  return null
+}
+
+function savePortfolioCache(filePath: string, data: { games: PortfolioGame[]; title?: string; totalUnits?: string }) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify({ lastUpdated: Date.now(), ...data }, null, 2))
+  } catch { /* ignore */ }
+}
 
 // Helper to manage history store
 function loadHistoryStore(): Record<string, { lastUpdated: number, data: { date: string, value: number }[] }> {
@@ -340,192 +677,156 @@ function fetchHistory(appId: string) {
         
         // Check if we need to update
         if (appHistory.lastUpdated && (now - appHistory.lastUpdated < FETCH_COOLDOWN)) {
-             console.log(`Skipping history fetch for ${appId} (cached & fresh)`);
+             console.log(`Skipping history fetch for ${appId} (cached & fresh) — triggering downstream fetches`);
+             // Still must trigger wishlist/playtime/players even when history is cached
+             fetchWishlist(appId);
              return;
         }
     }
     
     console.log(`Starting history fetch for ${appId}...`);
-    
-    // Calculate dates: All History (from 2000)
-    const formatDate = (d: Date) => d.toISOString().split('T')[0];
-    const today = new Date();
-    // Using full history URL as requested by user strategy
-    const url = `https://partner.steampowered.com/app/details/${appId}/?dateStart=2000-01-01&dateEnd=${formatDate(today)}`;
-    console.log(`Loading history URL: ${url}`);
-    
-    // Attach temporarily (invisible) to ensure JS runs
-    if (win) {
-        win.addBrowserView(backgroundView);
-        backgroundView.setBounds({ x: 0, y: 0, width: 0, height: 0 }); // Hidden
-    }
-    
-    const downloadToken = ++activeHistoryDownloadToken
-    const backgroundWebContentsId = backgroundView.webContents.id
-    const onWillDownload = (_event: ElectronEvent, item: DownloadItem, webContents: WebContents) => {
-        if (downloadToken !== activeHistoryDownloadToken) return
-        if (!backgroundView || backgroundView.webContents.isDestroyed()) return
-        if (webContents.id !== backgroundWebContentsId) return
+    // Tell renderer that a fresh fetch is starting (so it can show loading state)
+    win?.webContents.send('steam-history-fetching', appId)
 
-        const filename = item.getFilename().toLowerCase()
-        if (!filename.endsWith('.csv')) return
+    const dateStart = '2000-01-01'
+    const dateEnd = new Date().toISOString().split('T')[0]
+    // Load the app details page WITH date params so Steam sets the right cookies
+    // and the "view as csv" form has correct hidden field values.
+    // The POST to report_csv.php must come from this page (Referer check).
+    const appDetailsUrl = `https://partner.steampowered.com/app/details/${appId}/?dateStart=${dateStart}&dateEnd=${dateEnd}`
 
-        const savePath = path.join(app.getPath('temp'), `steam_history_${appId}_${Date.now()}.csv`);
-        item.setSavePath(savePath);
-        
-        item.once('done', (_doneEvent, state) => {
-            session.defaultSession.off('will-download', onWillDownload)
-            if (state === 'completed') {
-                console.log('Download completed:', savePath);
-                processHistoryCSV(appId, savePath);
-            } else {
-                console.log(`Download failed: ${state}`);
-            }
-        });
-    }
-    session.defaultSession.on('will-download', onWillDownload);
+    if (!win) return
+    backgroundView.webContents.removeAllListeners('did-finish-load')
+    win.addBrowserView(backgroundView)
+    backgroundView.setBounds({ x: 0, y: 0, width: 1, height: 1 })
 
-    backgroundView.webContents.loadURL(url);
-    
-    // Wait for load then trigger CSV download
+    console.log(`[history] Loading app details page: ${appDetailsUrl}`)
+    backgroundView.webContents.loadURL(appDetailsUrl)
     backgroundView.webContents.once('did-finish-load', async () => {
-        console.log('History page loaded. Triggering CSV download...');
-        
-        // Wait a bit for page interactivity
-        setTimeout(async () => {
-             // Script to find and click the "view as .csv" button/input
-             // Based on screenshot: input[type="submit"][value="view as .csv"] inside a form
-             const code = `
-                (function() {
-                    const btn = document.querySelector('input[value="view as .csv"]');
-                    if (btn) {
-                        btn.click();
-                        return true;
+        // Wait longer: Steam's app details page runs JS to render the form/table
+        await new Promise(r => setTimeout(r, 2500))
+        if (!backgroundView || backgroundView.webContents.isDestroyed()) return
+        try {
+            const result = await backgroundView.webContents.executeJavaScript(`
+                (async function() {
+                    function isValidCsv(text) {
+                        if (!text || text.length < 50) return false;
+                        if (/<!DOCTYPE|<html/i.test(text)) return false;
+                        return /\\d{4}-\\d{2}-\\d{2}/.test(text) || text.split('\\n').length > 3;
                     }
-                    // Fallback: Try to submit the form directly if button hidden
-                    const form = document.querySelector('form[action*="report_csv.php"]');
-                    if (form) {
-                        form.submit();
-                        return true;
+
+                    // Find the form that posts to report_csv.php (the "view as csv" button)
+                    var allForms = Array.from(document.querySelectorAll('form'));
+                    var csvForm = allForms.find(function(f) {
+                        return (f.action || '').includes('report_csv');
+                    });
+                    // Also try: find by submit button text
+                    if (!csvForm) {
+                        var btns = Array.from(document.querySelectorAll('input[type="submit"], button'));
+                        for (var btn of btns) {
+                            var label = (btn.value || btn.textContent || '').toLowerCase();
+                            if (label.includes('csv') || label.includes('download')) {
+                                csvForm = btn.closest('form');
+                                if (csvForm) break;
+                            }
+                        }
                     }
-                    return false;
+
+                    if (!csvForm) {
+                        // Log what forms exist for debugging
+                        var formInfo = allForms.map(function(f) {
+                            return { action: f.action, inputs: f.querySelectorAll('input[name]').length };
+                        });
+                        return { error: 'form_not_found', formsCount: allForms.length, formInfo: formInfo };
+                    }
+
+                    // Serialize all form fields
+                    var inputs = csvForm.querySelectorAll('input[name], select[name], textarea[name]');
+                    var bodyParts = [];
+                    for (var i = 0; i < inputs.length; i++) {
+                        var el = inputs[i];
+                        if (!el.name) continue;
+                        if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) continue;
+                        bodyParts.push(encodeURIComponent(el.name) + '=' + encodeURIComponent(el.value || ''));
+                    }
+                    var body = bodyParts.join('&');
+
+                    var res = await fetch(csvForm.action || 'https://partner.steampowered.com/report_csv.php', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: body
+                    });
+                    var text = await res.text();
+                    if (res.ok && isValidCsv(text)) return { csv: text };
+                    return { error: 'post_failed', status: res.status, preview: text.slice(0, 300), bodyLen: body.length, body: body.slice(0, 200) };
                 })()
-            `;
-            
-            try {
-                if (!backgroundView || backgroundView.webContents.isDestroyed()) {
-                    session.defaultSession.off('will-download', onWillDownload)
-                    return
-                }
-                const triggered = await backgroundView.webContents.executeJavaScript(code);
-                if (triggered) {
-                    console.log('CSV download triggered successfully.');
-                } else {
-                    console.error('Could not find CSV download button/form.');
-                    session.defaultSession.off('will-download', onWillDownload)
-                }
-            } catch (e) {
-                console.error('Failed to trigger CSV download:', e);
-                session.defaultSession.off('will-download', onWillDownload)
+            `)
+            const csvText = result && typeof result.csv === 'string' ? result.csv : null
+            if (csvText && csvText.length > 100) {
+                console.log(`[history] CSV fetched for ${appId}, ${csvText.length} chars.`)
+                processHistoryCSVContent(appId, csvText)
+            } else if (result?.error === 'form_not_found') {
+                console.error(`[history] Form not found on page for ${appId} (demo/playtest/no sales). forms=${result.formsCount}`, result.formInfo)
+                win?.webContents.send('steam-history-no-data', { appId })
+            } else {
+                console.error(`[history] POST failed for ${appId}. status=${result?.status}`)
+                if (result?.body) console.error(`[history] sent body: ${result.body}`)
+                if (result?.preview) console.error(`[history] response preview: ${JSON.stringify((result.preview as string).slice(0, 200))}`)
             }
-        }, 3000); 
-    });
+        } catch (e) {
+            console.error('[history] CSV fetch error:', e)
+        }
+        // Now trigger wishlist fetch after history is done to avoid backgroundView race
+        fetchWishlist(appId)
+    })
 }
 
-function processHistoryCSV(appId: string, filePath: string) {
+function processHistoryCSVContent(appId: string, fileContent: string) {
     try {
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        // Parse CSV
-        // Options: columns: true (detect headers), skip_empty_lines: true
-        // The file usually has some metadata rows at the top before the header?
-        // Or it's a clean CSV?
-        // Steam CSVs usually have a header row first.
-        
-        // Let's read first few lines to check structure
         const lines = fileContent.split('\n');
-        // Find header line index (containing "Date" and "Units")
         let headerIndex = 0;
-        for(let i=0; i<Math.min(10, lines.length); i++) {
+        for (let i = 0; i < Math.min(10, lines.length); i++) {
             if (lines[i].toLowerCase().includes('date') && lines[i].toLowerCase().includes('units')) {
                 headerIndex = i;
                 break;
             }
         }
-        
-        // Re-join from header onwards
         const cleanContent = lines.slice(headerIndex).join('\n');
-        
         const records = parse<Record<string, string>>(cleanContent, {
             columns: true,
             skip_empty_lines: true,
             trim: true
         });
-        
-        // Transform to our format: { date: string, value: number }
-        // Detect column names dynamically
         const newHistory: { date: string; value: number }[] = [];
-        
         if (records.length > 0) {
             const keys = Object.keys(records[0]);
-            // Find Date key
             const dateKey = keys.find(k => k.toLowerCase().includes('date'));
-            // Find Units key (Total Units, Steam Units, etc.)
             const unitsKey = keys.find(k => k.toLowerCase().includes('total units') || k.toLowerCase().includes('units'));
-            
             if (dateKey && unitsKey) {
                 for (const row of records) {
                     const dateStr = row[dateKey];
                     const unitsStr = row[unitsKey];
                     if (dateStr && unitsStr) {
-                         // Parse date to standard format YYYY-MM-DD if needed
-                         // Steam dates might be "Feb 21, 2026" or "2026-02-21"
-                         // Let's leave as string for now, but sort later?
-                         // Recharts needs consistent date format.
-                         // Let's assume standard format or try to normalize.
-                         
-                         // Clean units
-                         const val = parseInt(unitsStr.replace(/,/g, '')) || 0;
-                         
-                         // Normalize date to YYYY-MM-DD
-                         let formattedDate = dateStr;
-                         const parsedDate = new Date(dateStr);
-                         if (!isNaN(parsedDate.getTime())) {
-                             formattedDate = parsedDate.toISOString().split('T')[0];
-                         }
-                         
-                         newHistory.push({ date: formattedDate, value: val });
+                        const val = parseInt(unitsStr.replace(/,/g, '')) || 0;
+                        let formattedDate = dateStr;
+                        const parsedDate = new Date(dateStr);
+                        if (!isNaN(parsedDate.getTime())) {
+                            formattedDate = parsedDate.toISOString().split('T')[0];
+                        }
+                        newHistory.push({ date: formattedDate, value: val });
                     }
                 }
             }
         }
-        
-        // Merge with existing store (deduplicate)
-        // Actually, since we downloaded "All History", we can just overwrite.
-        // But user mentioned incremental.
-        // If we download "All History" every time, overwriting is fine and simpler.
-        // It ensures corrections are applied too.
-        
-        // Sort by date
         newHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        // Save
         const store = loadHistoryStore();
-        store[appId] = {
-            lastUpdated: Date.now(),
-            data: newHistory
-        };
+        store[appId] = { lastUpdated: Date.now(), data: newHistory };
         saveHistoryStore(store);
-        
-        console.log(`Processed ${newHistory.length} history records for ${appId}.`);
-        
-        // Send to renderer
+        console.log(`Processed ${newHistory.length} history records for ${appId} (from fetch).`);
         win?.webContents.send('steam-history-update', { appId, history: newHistory });
-        
-        // Cleanup temp file
-        fs.unlinkSync(filePath);
-        
     } catch (e) {
-        console.error('Error processing history CSV:', e);
+        console.error('Error processing history CSV content:', e);
     }
 }
 
@@ -535,12 +836,21 @@ function fetchWishlist(appId: string) {
         if (!backgroundView) return;
     }
 
+    const now = Date.now();
     const store = loadWishlistStore();
     const appWishlist = store[appId];
 
     if (appWishlist && appWishlist.data.length > 0) {
         win?.webContents.send('steam-wishlist-update', { appId, wishlist: appWishlist.data, currentOutstanding: appWishlist.currentOutstanding ?? null });
+        // If cache is fresh, skip re-download but still trigger downstream
+        if (appWishlist.lastUpdated && (now - appWishlist.lastUpdated < FETCH_COOLDOWN)) {
+            console.log(`Skipping wishlist fetch for ${appId} (cached & fresh) — triggering playtime/players`);
+            fetchPlaytime(appId);
+            return;
+        }
     }
+
+    console.log(`Starting wishlist fetch for ${appId}...`);
 
     if (win) {
         win.addBrowserView(backgroundView);
@@ -604,6 +914,14 @@ function fetchWishlist(appId: string) {
                 `)
                 console.log(`[wishlist] Meta for ${appId}:`, meta)
 
+                // If game was never wishlisted (no firstDate and no outstanding), skip CSV download
+                if (!meta?.firstDate && (meta?.currentOutstanding === 0 || meta?.currentOutstanding === null)) {
+                    console.log(`[wishlist] No wishlist data for ${appId}, skipping CSV download`)
+                    win?.webContents.send('steam-wishlist-update', { appId, wishlist: [], currentOutstanding: 0, noData: true })
+                    fetchPlaytime(appId)
+                    return
+                }
+
                 const dateStart = meta?.firstDate || '2000-01-01'
                 const dateEnd = new Date().toISOString().split('T')[0]
                 const csvUrl = `https://partner.steampowered.com/report_csv.php?file=SteamWishlists_${appId}_${dateStart}_to_${dateEnd}&params=query=QueryWishlistActionsForCSV^appID=${appId}^dateStart=${dateStart}^dateEnd=${dateEnd}^interpreter=WishlistReportInterpreter`
@@ -618,8 +936,11 @@ function fetchWishlist(appId: string) {
                 `)
                 if (requestToken !== activeWishlistDownloadToken) return
                 processWishlistCSVContent(appId, csvText || '', meta?.currentOutstanding ?? null)
+                // Chain playtime fetch after wishlist completes (serial, avoids backgroundView race)
+                fetchPlaytime(appId)
             } catch (e) {
                 console.error('Failed to trigger wishlist csv download:', e);
+                fetchPlaytime(appId)
             }
         }, 2000);
     });
@@ -643,10 +964,10 @@ function processWishlistCSVContent(appId: string, fileContent: string, currentOu
         let headerIndex = -1;
         for (let i = 0; i < Math.min(60, lines.length); i++) {
             const line = lines[i].toLowerCase()
-            if (
-                line.includes('date') &&
-                (line.includes('wishlist') || line.includes('add') || line.includes('outstanding') || line.includes('balance'))
-            ) {
+            const hasDate = line.includes('date') || line.includes('datelocal')
+            const hasAdds = line.includes('add') || line.includes('adds')
+            const hasDeletes = line.includes('delet') || line.includes('deletes')
+            if (hasDate && (hasAdds || hasDeletes || line.includes('wishlist') || line.includes('outstanding') || line.includes('balance'))) {
                 headerIndex = i;
                 break;
             }
@@ -731,132 +1052,181 @@ function processWishlistCSVContent(appId: string, fileContent: string, currentOu
     }
 }
 
-async function scrapePortfolioData() {
-   if (!steamView || steamView.webContents.isDestroyed()) return
- 
-   const code = `
-     (function() {
-       try {
-         const data = { type: 'portfolio', games: [] };
-         
-         // Helper to clean text
-         const cleanText = (text) => text ? text.replace(/\\s+/g, ' ').trim() : '';
-         
-         // Find all rows in the document
-        const rows = Array.from(document.querySelectorAll('tr'));
-        
-        // Extract Company-wide stats (usually at top)
-        // Look for rows with "Lifetime revenue", "Steam units", etc.
-        // The screenshot shows:
-        // ACTIDIMENSION... Lifetime revenue | $147,297
-        // ... Steam units | 29,872
-        
-        // Helper to find value in row by label
-        const findStat = (labelPattern) => {
-            for (const row of rows) {
-                if (row.innerText.match(labelPattern)) {
-                    // usually value is in the last cell or second cell
-                    const cells = row.querySelectorAll('td');
-                    if (cells.length > 0) {
-                        return cells[cells.length - 1].innerText.trim();
-                    }
-                }
-            }
-            return null;
-        };
 
-        data.lifetimeRevenue = findStat(/Lifetime revenue/i);
-        data.steamUnits = findStat(/Steam units/i);
-        data.retailActivations = findStat(/retail activations/i);
-        data.totalUnits = findStat(/lifetime units total/i) || findStat(/Total units/i);
-        
-        // Also get company name from h2 or title
-        const companyHeader = document.querySelector('h2');
-        if (companyHeader && companyHeader.innerText.includes('Steam Stats')) {
-             data.title = companyHeader.innerText.replace('Steam Stats - ', '').trim();
-        }
-
-        // Try to identify column indices from header
-         let unitsColIndex = -1;
-         let rankColIndex = -1;
-         
-         // Look for header row safely
-         const headerRow = Array.from(document.querySelectorAll('tr')).find(r => 
-             r.innerText.toLowerCase().includes('rank') && 
-             (r.innerText.toLowerCase().includes('units') || r.innerText.toLowerCase().includes('product'))
-         ) || rows[0];
-         
-         if (headerRow) {
-             const cells = headerRow.querySelectorAll('th, td');
-             for (let i = 0; i < cells.length; i++) {
-                 const text = cells[i].innerText.toLowerCase();
-                 if (text.includes('rank')) rankColIndex = i;
-                 if ((text.includes('units') && (text.includes('current') || text.includes('today'))) || text === 'current units') unitsColIndex = i;
-             }
-         }
-
+const PORTFOLIO_SCRAPE_SCRIPT = `
+  (function() {
+    try {
+      const data = { type: 'portfolio', games: [], _debug: {} };
+      const cleanText = (text) => text ? text.replace(/\\s+/g, ' ').trim() : '';
+      const rows = Array.from(document.querySelectorAll('tr'));
+      const findStat = (labelPattern) => {
         for (const row of rows) {
-             const link = row.querySelector('a[href*="/app/details/"]');
-             
-             // Ensure this row actually has cells and looks like a product row
-             const cells = row.querySelectorAll('td');
-             
-             if (link && cells.length >= 3) {
-                 const name = cleanText(link.innerText);
-                 const href = link.getAttribute('href');
-                 const appIdMatch = href.match(/app\\/details\\/(\\d+)/);
-                 const appId = appIdMatch ? appIdMatch[1] : null;
-                 
-                 if (appId) {
-                      let rank = '0';
-                      let units = '0';
-                      
-                      // Strategy 1: Use identified column indices
-                      if (unitsColIndex > -1 && cells[unitsColIndex]) {
-                          units = cleanText(cells[unitsColIndex].innerText);
-                      }
-                      if (rankColIndex > -1 && cells[rankColIndex]) {
-                          rank = cleanText(cells[rankColIndex].innerText);
-                      }
+          if (row.innerText.match(labelPattern)) {
+            const cells = row.querySelectorAll('td');
+            if (cells.length > 0) return cells[cells.length - 1].innerText.trim();
+          }
+        }
+        return null;
+      };
+      data.lifetimeRevenue = findStat(/Lifetime revenue/i);
+      data.steamUnits = findStat(/Steam units/i);
+      data.retailActivations = findStat(/retail activations/i);
+      data.totalUnits = findStat(/lifetime units total/i) || findStat(/Total units/i);
+      const companyHeader = document.querySelector('h2');
+      if (companyHeader && companyHeader.innerText.includes('Steam Stats')) {
+        data.title = companyHeader.innerText.replace('Steam Stats - ', '').trim();
+      }
+      let unitsColIndex = -1, rankColIndex = -1;
+      const headerRow = Array.from(document.querySelectorAll('tr')).find(r =>
+        r.innerText.toLowerCase().includes('rank') && (r.innerText.toLowerCase().includes('units') || r.innerText.toLowerCase().includes('product'))
+      ) || rows[0];
+      // Collect ALL header cell texts for debugging
+      const allHeaderTexts = [];
+      if (headerRow) {
+        const cells = headerRow.querySelectorAll('th, td');
+        for (let i = 0; i < cells.length; i++) {
+          const text = cells[i].innerText.toLowerCase().trim();
+          allHeaderTexts.push(text);
+          if (text.includes('rank')) rankColIndex = i;
+          // Broaden match: any column that contains 'units' (not just with 'current'/'today')
+          if (text.includes('units')) {
+            // Prefer columns specifically mentioning today/current; otherwise take any units col as fallback
+            if (unitsColIndex === -1 || text.includes('current') || text.includes('today')) unitsColIndex = i;
+          }
+        }
+      }
+      data._debug = { allHeaderTexts, unitsColIndex, rankColIndex, pageUrl: location.href };
+      for (const row of rows) {
+        const link = row.querySelector('a[href*="/app/details/"]');
+        const cells = row.querySelectorAll('td');
+        if (link && cells.length >= 3) {
+          const name = cleanText(link.innerText);
+          const href = link.getAttribute('href');
+          const appIdMatch = href.match(/app\\/details\\/(\\d+)/);
+          const appId = appIdMatch ? appIdMatch[1] : null;
+          if (appId) {
+            let rank = '0', units = '0';
+            if (unitsColIndex > -1 && cells[unitsColIndex]) units = cleanText(cells[unitsColIndex].innerText);
+            if (rankColIndex > -1 && cells[rankColIndex]) rank = cleanText(cells[rankColIndex].innerText);
+            if (units === '0' && rank === '0') {
+              const linkParentCell = link.closest('td');
+              if (linkParentCell) {
+                const cellIndex = Array.from(row.children).indexOf(linkParentCell);
+                if (cellIndex > -1) {
+                  if (cells[cellIndex + 1]) rank = cleanText(cells[cellIndex + 1].innerText);
+                  if (cells[cellIndex + 2]) units = cleanText(cells[cellIndex + 2].innerText);
+                }
+              }
+            }
+            data.games.push({ name, appId, rank, units });
+          }
+        }
+      }
+      return data;
+    } catch (e) {
+      return { error: e.message };
+    }
+  })()
+`
 
-                      // Strategy 2: Fallback to relative position (Link -> Rank -> Units)
-                      if (units === '0' && rank === '0') {
-                          const linkParentCell = link.closest('td');
-                          if (linkParentCell) {
-                              // Find index of this cell
-                              const cellIndex = Array.from(row.children).indexOf(linkParentCell);
-                              if (cellIndex > -1) {
-                                  // Assume Rank is next, Units is next next
-                                  if (cells[cellIndex + 1]) rank = cleanText(cells[cellIndex + 1].innerText);
-                                  if (cells[cellIndex + 2]) units = cleanText(cells[cellIndex + 2].innerText);
-                              }
-                          }
-                      }
-                      
-                      data.games.push({
-                          name,
-                          appId,
-                          rank,
-                          units
-                      });
-                 }
-             }
-         }
-         
-         return data;
-       } catch (e) {
-         return { error: e.message };
-       }
-     })()
-   `
-
+async function scrapePortfolioFromWebContents(webContents: WebContents): Promise<{ type: string; games: Array<{ name: string; appId: string; rank: string; units: string }>; title?: string; totalUnits?: string } | null> {
   try {
-    const result = await steamView.webContents.executeJavaScript(code)
-    console.log('Scraped Portfolio Data:', result)
-    win?.webContents.send('steam-data-update', result)
+    const result = await webContents.executeJavaScript(PORTFOLIO_SCRAPE_SCRIPT)
+    if (result && result._debug) {
+      console.log('[portfolio-scrape] pageUrl:', result._debug.pageUrl)
+      console.log('[portfolio-scrape] header cols:', JSON.stringify(result._debug.allHeaderTexts))
+      console.log('[portfolio-scrape] unitsColIndex:', result._debug.unitsColIndex, '| rankColIndex:', result._debug.rankColIndex)
+      if (result.games?.length > 0) {
+        const preview = result.games.slice(0, 3).map((g: {name:string;units:string}) => `${g.name}: ${g.units}`).join(', ')
+        console.log('[portfolio-scrape] first 3 games:', preview)
+      }
+    }
+    return result && !result.error ? result : null
   } catch (e) {
-    console.error('Portfolio Scraping failed:', e)
+    console.error('Portfolio scrape from webContents failed:', e)
+    return null
   }
+}
+
+// Fetch Today portfolio data via backgroundView (always loads clean URL so we get Today view, not whatever steamView shows)
+async function fetchPortfolioToday() {
+  if (!backgroundView) { createBackgroundView(); if (!backgroundView) return }
+  if (!win) return
+
+  const today = new Date().toISOString().split('T')[0]
+  // Explicitly pass today's date so Steam is forced to show single-day (Today) data,
+  // regardless of what the user's session last viewed (All History, 7 days, etc.)
+  const todayUrl = `${STEAM_ALL_APPS_URL}?dateStart=${today}&dateEnd=${today}`
+
+  // Validate cached data: only use if its lastUpdated date matches today
+  const cache = loadPortfolioCache(PORTFOLIO_TODAY_FILE)
+  const cacheDate = cache?.lastUpdated ? new Date(cache.lastUpdated).toISOString().split('T')[0] : null
+  const cacheIsToday = cacheDate === today
+  if (cache && cache.games?.length > 0 && cacheIsToday) {
+    console.log(`[portfolio-today] Sending cached today data (${cache.games.length} games)`)
+    win.webContents.send('steam-data-update', { type: 'portfolio', games: cache.games, title: cache.title, totalUnits: cache.totalUnits })
+    if (cache.lastUpdated && Date.now() - cache.lastUpdated < FETCH_COOLDOWN) {
+      console.log('[portfolio-today] Cache is fresh, skipping fetch')
+      return
+    }
+  }
+
+  console.log(`[portfolio-today] Fetching fresh Today data (${today}) from background...`)
+  console.log(`[portfolio-today] Loading URL: ${todayUrl}`)
+  backgroundView.webContents.removeAllListeners('did-finish-load')
+  win.addBrowserView(backgroundView)
+  backgroundView.setBounds({ x: 0, y: 0, width: 1, height: 1 })
+  // Open DevTools on backgroundView so we can inspect the actual page loaded
+  backgroundView.webContents.openDevTools({ mode: 'detach' })
+  // Load with explicit today date → forces Today single-day view
+  backgroundView.webContents.loadURL(todayUrl)
+  backgroundView.webContents.once('did-finish-load', async () => {
+    await new Promise(r => setTimeout(r, 1500))
+    if (!backgroundView || backgroundView.webContents.isDestroyed()) return
+    const result = await scrapePortfolioFromWebContents(backgroundView.webContents)
+    if (win && !win.webContents.isDestroyed() && result && result.games?.length > 0) {
+      savePortfolioCache(PORTFOLIO_TODAY_FILE, { games: result.games, title: result.title, totalUnits: result.totalUnits })
+      win.webContents.send('steam-data-update', { type: 'portfolio', games: result.games, title: result.title, totalUnits: result.totalUnits })
+      console.log(`[portfolio-today] Fetched ${result.games.length} games`)
+    }
+    backgroundView?.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+  })
+}
+
+// Fetch All History portfolio data via backgroundView with date params
+async function fetchPortfolioAllHistory() {
+  if (!backgroundView) { createBackgroundView(); if (!backgroundView) return }
+  if (!win) return
+
+  // Send cached data immediately if available
+  const cache = loadPortfolioCache(PORTFOLIO_ALLHISTORY_FILE)
+  if (cache && cache.games?.length > 0) {
+    console.log(`[portfolio-allhistory] Sending cached data (${cache.games.length} games)`)
+    win.webContents.send('steam-portfolio-all-history', { games: cache.games, title: cache.title, totalUnits: cache.totalUnits })
+    if (cache.lastUpdated && Date.now() - cache.lastUpdated < FETCH_COOLDOWN) {
+      console.log('[portfolio-allhistory] Cache is fresh, skipping fetch')
+      return
+    }
+  }
+
+  console.log('[portfolio-allhistory] Fetching fresh All History data from background...')
+  backgroundView.webContents.removeAllListeners('did-finish-load')
+  win.addBrowserView(backgroundView)
+  backgroundView.setBounds({ x: 0, y: 0, width: 1, height: 1 })
+  const dateEnd = new Date().toISOString().split('T')[0]
+  // Load URL WITH date params → Steam shows All History view
+  backgroundView.webContents.loadURL(`${STEAM_ALL_APPS_URL}?dateStart=2000-01-01&dateEnd=${dateEnd}`)
+  backgroundView.webContents.once('did-finish-load', async () => {
+    await new Promise(r => setTimeout(r, 1500))
+    if (!backgroundView || backgroundView.webContents.isDestroyed()) return
+    const result = await scrapePortfolioFromWebContents(backgroundView.webContents)
+    if (win && !win.webContents.isDestroyed() && result && result.games?.length > 0) {
+      savePortfolioCache(PORTFOLIO_ALLHISTORY_FILE, { games: result.games, title: result.title, totalUnits: result.totalUnits })
+      win.webContents.send('steam-portfolio-all-history', { games: result.games, title: result.title, totalUnits: result.totalUnits })
+      console.log(`[portfolio-allhistory] Fetched ${result.games.length} games`)
+    }
+    backgroundView?.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+  })
 }
 
 async function scrapeData() {
@@ -1051,6 +1421,35 @@ ipcMain.on('request-visibility-state', () => {
   }
 })
 
+// IPC: renderer requests re-send of current page data (e.g. when stuck on "Waiting for Data")
+ipcMain.on('request-initial-data', () => {
+  if (!steamView || steamView.webContents.isDestroyed()) return
+  const url = steamView.webContents.getURL()
+  if (TARGET_URL_PATTERN.test(url)) {
+    scrapeData()
+  } else if (ALL_PRODUCTS_PATTERN.test(url)) {
+    fetchPortfolioToday()
+  }
+})
+
+// IPC: retry fetching history/wishlist for an app (e.g. when "Waiting for Historical Data" and user clicks Retry)
+ipcMain.on('retry-history-fetch', (_event, appId?: string) => {
+  let targetAppId = appId
+  if (!targetAppId && steamView && !steamView.webContents.isDestroyed()) {
+    const url = steamView.webContents.getURL()
+    const match = url.match(/app\/details\/(\d+)/)
+    if (match) targetAppId = match[1]
+  }
+  if (targetAppId) {
+    // fetchWishlist is called inside fetchHistory after completion to avoid backgroundView race
+    fetchHistory(targetAppId)
+  }
+})
+
+ipcMain.on('request-portfolio-all-history', () => {
+  fetchPortfolioAllHistory()
+})
+
 function setDashboardVisibility(show: boolean) {
   dashboardActive = show
   if (!win || !steamView || steamView.webContents.isDestroyed()) return
@@ -1098,9 +1497,36 @@ ipcMain.on('refresh-data', () => {
     }
 })
 
-app.whenReady().then(createWindow)
+// Fullscreen toggle (Windows: F11 or toolbar button)
+ipcMain.on('toggle-fullscreen', () => {
+  if (win && !win.isDestroyed()) {
+    win.setFullScreen(!win.isFullScreen())
+  }
+})
+
+app.whenReady().then(() => {
+  // On startup, delete portfolio-today cache if it's from a previous day to avoid stale data
+  const today = new Date().toISOString().split('T')[0]
+  const todayCache = loadPortfolioCache(PORTFOLIO_TODAY_FILE)
+  if (todayCache?.lastUpdated) {
+    const cachedDate = new Date(todayCache.lastUpdated).toISOString().split('T')[0]
+    if (cachedDate !== today) {
+      try { fs.unlinkSync(PORTFOLIO_TODAY_FILE) } catch { /* ignore */ }
+      console.log(`[portfolio-today] Cleared stale cache from ${cachedDate}`)
+    }
+  }
+
+  createWindow()
+  // F11 fullscreen on Windows (and other platforms)
+  globalShortcut.register('F11', () => {
+    if (win && !win.isDestroyed()) {
+      win.setFullScreen(!win.isFullScreen())
+    }
+  })
+})
 
 app.on('window-all-closed', () => {
+  globalShortcut.unregisterAll()
   win = null
   if (process.platform !== 'darwin') app.quit()
 })

@@ -26,6 +26,10 @@ export const translations = {
     waitingWishlistDesc: 'The background process is fetching wishlist CSV data. This may take a moment.',
     slowHint: 'Data fetch is taking longer than expected. Please close dashboard and check the external Steamworks page status/login, then reopen.',
     back: 'ALL APPS',
+    backToBrowser: 'Back to Steam',
+    requestDataAgain: 'Request data again',
+    retry: 'Retry',
+    fetching: 'Fetching...',
 
     // Sales Analysis
     salesPerformance: 'SALES PERFORMANCE',
@@ -61,11 +65,60 @@ export const translations = {
     // Portfolio
     globalPortfolio: 'Global Portfolio View',
     totalUnitsToday: 'TOTAL UNITS TODAY',
+    totalUnitsAllHistory: 'TOTAL UNITS (ALL HISTORY)',
+    portfolioRangeToday: 'Today',
+    portfolioRangeAllHistory: 'All History',
     active: 'ACTIVE',
     unitsToday: 'Units Today',
+    unitsAllHistory: 'Units (All)',
     rank: 'RANK',
     signOut: 'Sign Out',
     signOutConfirm: 'Are you sure you want to sign out?',
+
+    // Players Insights
+    playersCurrentPlayers: 'Current Players',
+    playersLifetimeAvgDAU: 'Lifetime Avg DAU',
+    playersRecentAvgDAU: 'Recent Avg DAU',
+    playersAvgPeak: 'Avg Peak Concurrent',
+    playersMaxPeak: 'Max Peak Concurrent',
+    playersMaxDAU: 'Max Daily Active',
+    playersAvgSteamDeck: 'Avg Steam Deck',
+    playersMaxSteamDeck: 'Max Steam Deck',
+    playersConcurrentHistory: 'Peak Concurrent & Daily Active History',
+    playersRange: '30D',
+
+    // Playtime Insights
+    playtimeTab: 'playtime',
+    playtimeTitle: 'PLAYTIME ANALYSIS',
+    playtimeUsers: 'Lifetime Users Measured',
+    playtimeAvg: 'Avg Time Played',
+    playtimeMedian: 'Median Time Played',
+    playtimeRange: 'Std Dev Range',
+    playtimeRetention: 'Player Retention',
+    playtimeRetentionDesc: 'Percentage of users who played at least X minutes',
+    playtimeRadar: 'Engagement Profile',
+    playtimeMinutes: 'min',
+    playtimeHours: 'hr',
+    playtimeWaiting: 'Waiting for Playtime Data',
+    playtimeWaitingDesc: 'Fetching playtime stats from Steamworks. This may take a moment.',
+
+    // Extended Metrics
+    emBestDay: 'BEST DAY',
+    emUnitsSold: 'units sold',
+    em7dGrowth: '7D GROWTH',
+    emVsPrev7: 'vs prev 7 days',
+    emActiveDays: 'ACTIVE DAYS',
+    emOfTracked: 'of {n} tracked',
+    emVelocity: 'VELOCITY',
+    emVelocityDesc: '30D avg vs 90D avg',
+    emLast30D: 'LAST 30D',
+    emLast90D: 'LAST 90D',
+    emPrev: 'prev',
+    emAvgMedian: 'AVG / MEDIAN',
+    emMedian: 'median',
+    emBestMonth: 'BEST MONTH',
+    emCumulative: 'CUMULATIVE SALES',
+    emWeeklyPattern: 'WEEKLY PATTERN',
 
     // Advanced Insights
     heatmapTitle: 'DAILY SALES HEATMAP',
@@ -100,6 +153,12 @@ export const translations = {
     totalAdditions: 'Total Additions',
     totalOutflow: 'Total Outflow',
     netChange: 'Net Change',
+
+    // No-data states
+    salesNoData: 'No Sales Data',
+    salesNoDataDesc: 'Demos, Playtests, and unreleased games do not generate sales reports.',
+    wishlistNoData: 'No Wishlist Data',
+    wishlistNoDataDesc: 'This game has never been wishlisted or has no records available.',
   },
   'zh-CN': {
     // Dashboard Header
@@ -128,6 +187,10 @@ export const translations = {
     waitingWishlistDesc: '后台正在抓取愿望单 CSV 数据，请稍候。',
     slowHint: '数据抓取时间较长，请先关闭 dashboard，检查外部 Steamworks 页面状态或登录态后再重开。',
     back: '返回列表',
+    backToBrowser: '返回 Steam 页面',
+    requestDataAgain: '重新获取数据',
+    retry: '重试',
+    fetching: '请求中...',
 
     // Sales Analysis
     salesPerformance: '销售表现',
@@ -163,11 +226,60 @@ export const translations = {
     // Portfolio
     globalPortfolio: '全局概览',
     totalUnitsToday: '今日总销量',
+    totalUnitsAllHistory: '总销量（全部历史）',
+    portfolioRangeToday: '今日',
+    portfolioRangeAllHistory: '全部历史',
     active: '活跃',
     unitsToday: '今日销量',
+    unitsAllHistory: '销量（全部）',
     rank: '排名',
     signOut: '退出登录',
     signOutConfirm: '确定要退出登录吗？',
+
+    // Players Insights
+    playersCurrentPlayers: '当前在线',
+    playersLifetimeAvgDAU: '历史日均活跃',
+    playersRecentAvgDAU: '近期日均活跃',
+    playersAvgPeak: '日均峰值并发',
+    playersMaxPeak: '最高峰值并发',
+    playersMaxDAU: '最高日活',
+    playersAvgSteamDeck: 'Steam Deck 日均',
+    playersMaxSteamDeck: 'Steam Deck 最高',
+    playersConcurrentHistory: '峰值并发 & 日活历史',
+    playersRange: '30天',
+
+    // Playtime Insights
+    playtimeTab: '游戏时长',
+    playtimeTitle: '游戏时长分析',
+    playtimeUsers: '统计用户总数',
+    playtimeAvg: '平均游戏时长',
+    playtimeMedian: '中位游戏时长',
+    playtimeRange: '标准差范围',
+    playtimeRetention: '玩家留存率',
+    playtimeRetentionDesc: '至少游玩 X 分钟的用户占比',
+    playtimeRadar: '参与度画像',
+    playtimeMinutes: '分钟',
+    playtimeHours: '小时',
+    playtimeWaiting: '等待游戏时长数据',
+    playtimeWaitingDesc: '正在从 Steamworks 获取游戏时长数据，请稍候。',
+
+    // Extended Metrics
+    emBestDay: '最佳日',
+    emUnitsSold: '销量',
+    em7dGrowth: '7日增长',
+    emVsPrev7: '对比前7天',
+    emActiveDays: '活跃天数',
+    emOfTracked: '共 {n} 天',
+    emVelocity: '加速度',
+    emVelocityDesc: '30日均 vs 90日均',
+    emLast30D: '近30天',
+    emLast90D: '近90天',
+    emPrev: '上期',
+    emAvgMedian: '均值 / 中位数',
+    emMedian: '中位数',
+    emBestMonth: '最佳月份',
+    emCumulative: '累计销量',
+    emWeeklyPattern: '周内分布',
 
     // Advanced Insights
     heatmapTitle: '每日销量热力图',
@@ -202,6 +314,12 @@ export const translations = {
     totalAdditions: '总新增',
     totalOutflow: '总流失',
     netChange: '净变化',
+
+    // No-data states
+    salesNoData: '该游戏暂无销量数据',
+    salesNoDataDesc: 'Demo、Playtest 或尚未发售的游戏不生成销量报告。',
+    wishlistNoData: '该游戏暂无愿望单数据',
+    wishlistNoDataDesc: '该游戏从未被添加到愿望单，或暂无相关记录。',
   }
 }
 
