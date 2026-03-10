@@ -18,6 +18,7 @@ A modern, real-time dashboard for Steam app/game developers to visualize sales d
 
 **Deep Data Analysis**
 *   **Sales Performance**: Interactive charts for revenue and units sold. Filter by *7 Days*, *30 Days*, *90 Days*, *1 Year*, *All Time*, or define a *Custom Date Range*.
+*   **Playtime Visualization**: Analyze player playtime trends with dedicated visual analytics.
 *   **Advanced Insights**:
     *   **Heatmaps**: Visualize sales intensity across the calendar year.
     *   **Weekly Patterns**: Identify your game's best performing days of the week.
@@ -43,6 +44,9 @@ A modern, real-time dashboard for Steam app/game developers to visualize sales d
 
 **Download**
 Get the latest version from the [Releases Page](https://github.com/the-super-engine/steam-sales-dashboard/releases).
+
+**Windows Users**
+Windows builds may trigger a Microsoft SmartScreen warning. If this appears, click **More info** and then **Run anyway**.
 
 **macOS Users**
 If the app is blocked on launch, run this command in Terminal:

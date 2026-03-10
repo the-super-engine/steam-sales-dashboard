@@ -5,7 +5,7 @@ import {
   AreaChart, Area, Cell, Legend,
 } from 'recharts'
 import { Clock, Users, Activity, Zap, Monitor } from 'lucide-react'
-import CountUp from 'react-countup'
+// import CountUp from 'react-countup'
 import { translations, type Locale } from '../lib/locales'
 
 type RetentionRow = { threshold: string; minutes: number; percentage: number }
