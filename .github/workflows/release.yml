@@ -9,9 +9,6 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    env:
-      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
-      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
@@ -42,7 +39,27 @@ jobs:
             exit 1
           fi
 
-      - name: Build App
+      - name: Build App (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          n=0
+          until [ "$n" -ge 3 ]
+          do
+            npm run build && break
+            n=$((n+1))
+            echo "Build failed, retrying $n/3..."
+            sleep 10
+          done
+          [ "$n" -lt 3 ]
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+        timeout-minutes: 30
+
+      - name: Build App (macOS)
+        if: matrix.os == 'macos-latest'
         shell: bash
         run: |
           n=0
