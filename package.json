@@ -1,7 +1,7 @@
 {
   "name": "steam-sales-dashboard",
   "private": true,
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "A modern dashboard for Steam Sales",
   "author": "Jeff @ Soda Game Studio",
   "main": "dist-electron/main.js",
@@ -9,9 +9,14 @@
     "appId": "com.sodagame.steamdashboard",
     "productName": "Steam Sales Dashboard",
     "directories": {
-      "output": "dist",
+      "output": "release",
       "buildResources": "build"
     },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
     "mac": {
       "icon": "build/icon.icns",
       "identity": null,

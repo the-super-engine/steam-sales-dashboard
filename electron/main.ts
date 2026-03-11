@@ -1176,8 +1176,10 @@ async function fetchPortfolioToday() {
   backgroundView.webContents.removeAllListeners('did-finish-load')
   win.addBrowserView(backgroundView)
   backgroundView.setBounds({ x: 0, y: 0, width: 1, height: 1 })
-  // Open DevTools on backgroundView so we can inspect the actual page loaded
-  backgroundView.webContents.openDevTools({ mode: 'detach' })
+  // Open DevTools only in dev mode
+  if (process.env.VITE_DEV_SERVER_URL) {
+    backgroundView.webContents.openDevTools({ mode: 'detach' })
+  }
   // Load with explicit today date → forces Today single-day view
   backgroundView.webContents.loadURL(todayUrl)
   backgroundView.webContents.once('did-finish-load', async () => {
