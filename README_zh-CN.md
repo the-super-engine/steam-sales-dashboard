@@ -1,6 +1,6 @@
 # Steam Sales Dashboard
 
-[English](README.md) | [简体中文](README_zh-CN.md)
+[English](README.md) | [简体中文](README_zh-CN.md) | [网站](https://steamdashboard.com/)
 
 ![Steam Sales Dashboard Cover](readme_cover.png)
 
