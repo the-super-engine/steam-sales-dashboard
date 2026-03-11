@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CalendarDays, SlidersHorizontal } from 'lucide-react'
 import { addDays, eachDayOfInterval, endOfYear, format, getDay, parseISO, startOfYear, subDays } from 'date-fns'
@@ -183,13 +184,10 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
                     key={day.key}
                     className={cn('w-3.5 h-3.5 rounded-[2px] border border-white/5', getHeatColor(day.value < minUnits ? 0 : day.value, maxHeatValue))}
                     onMouseEnter={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect()
-                        setHovered({ 
-                            date: day.key, 
-                            value: day.value, 
-                            x: rect.left + rect.width / 2, 
-                            y: rect.top 
-                        })
+                        setHovered({ date: day.key, value: day.value, x: e.clientX, y: e.clientY })
+                    }}
+                    onMouseMove={(e) => {
+                        setHovered(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null)
                     }}
                     onMouseLeave={() => setHovered(null)}
                   />
@@ -200,17 +198,18 @@ export default function AdvancedInsights({ history, locale = 'en' }: AdvancedIns
         </div>
         
         {/* Custom Tooltip */}
-        {hovered && (
+        {hovered && createPortal(
             <div 
-                className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full px-3 py-2 bg-zinc-900 border border-white/10 rounded shadow-xl text-xs font-mono text-white transition-opacity duration-75"
-                style={{ left: hovered.x, top: hovered.y - 8 }}
+                className="fixed z-[9999] pointer-events-none px-3 py-2 bg-zinc-900 border border-white/10 rounded shadow-xl text-xs font-mono text-white"
+                style={{ left: hovered.x + 14, top: hovered.y - 48 }}
             >
                 <div className="font-bold text-gray-400 mb-1">{hovered.date}</div>
                 <div className="text-lg font-bold text-white leading-none">
                     {hovered.value.toLocaleString()} 
                     <span className="text-gray-500 text-[10px] ml-1 font-normal uppercase">{t.unitsLabel}</span>
                 </div>
-            </div>
+            </div>,
+            document.body
         )}
 
         <div className="flex items-center justify-end gap-2 text-[10px] font-mono text-gray-500 mt-3">
